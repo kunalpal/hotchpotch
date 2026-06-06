@@ -19,7 +19,7 @@ const INJECTED_PREFIX = '__injected__';
 // only inside callbacks (onToolCall, handleSubmit), satisfying react-hooks/immutability.
 export function useConversationManager(
   runtimeManagerRef: MutableRefObject<RuntimeManager>,
-  onBeforeSend?: (message: string) => Promise<void>
+  onBeforeSend?: (message: string) => Promise<string[]>
 ) {
   const [input, setInput] = useState('');
   const activePanelId = useRef<string | null>(null);
@@ -123,8 +123,8 @@ export function useConversationManager(
       setInput('');
 
       const doSend = async () => {
-        // Run pre-send hook (e.g. widget selection) before the API call
-        if (onBeforeSend) await onBeforeSend(trimmed);
+        // Run pre-send hook (widget selection + context injectors)
+        const contextLines = onBeforeSend ? await onBeforeSend(trimmed) : [];
 
         let text = trimmed;
 
@@ -140,6 +140,14 @@ export function useConversationManager(
           }
         }
 
+        // Prepend skill-injected context lines to the message text —
+        // same pattern as the passive buffer, keeping both in the user turn
+        if (contextLines.length > 0) {
+          const injected = contextLines
+            .map((l) => `[Context: ${l}]`)
+            .join('\n');
+          text = `${injected}\n\n${text}`;
+        }
         sendMessage({ text });
       };
 

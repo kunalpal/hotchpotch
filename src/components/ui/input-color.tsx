@@ -312,6 +312,7 @@ export default function InputColor({
 
   // Initialize color values on mount and when value changes from outside
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     updateColorValues(value);
     setHexInputValue(value.toUpperCase());
     // eslint-disable-next-line react-hooks/exhaustive-deps

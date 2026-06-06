@@ -87,7 +87,7 @@ export function MarkupEditor({
           rows={variant === 'condensed' ? 4 : rows}
           className={cn(
             'resize-none font-mono text-sm',
-            variant === 'condensed' && 'min-h-[80px] p-2'
+            variant === 'condensed' && 'min-h-20 p-2'
           )}
         />
       </TabsContent>
@@ -98,8 +98,8 @@ export function MarkupEditor({
       >
         <div
           className={cn(
-            'border-input rounded-md border p-3 text-wrap break-words',
-            variant === 'condensed' ? 'min-h-[80px] p-2' : 'min-h-[200px]'
+            'border-input rounded-md border p-3 text-wrap wrap-break-word',
+            variant === 'condensed' ? 'min-h-20 p-2' : 'min-h-50'
           )}
         >
           {value ? (

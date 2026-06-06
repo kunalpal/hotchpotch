@@ -120,11 +120,13 @@ const TreeView = React.forwardRef<HTMLDivElement, TreeProps>(
       React.useState<string[]>(controlledSelectedItemIds || []);
 
     React.useEffect(() => {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setSelectedItemId(initialSelectedItemId);
     }, [initialSelectedItemId]);
 
     React.useEffect(() => {
       if (controlledSelectedItemIds) {
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setInternalSelectedItemIds(controlledSelectedItemIds);
       }
     }, [controlledSelectedItemIds]);
@@ -432,6 +434,7 @@ const TreeNode = React.memo(
 
     React.useEffect(() => {
       if (expandedItemIds.includes(item.id)) {
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setValue((prev) =>
           prev.includes(item.id) ? prev : [...prev, item.id]
         );

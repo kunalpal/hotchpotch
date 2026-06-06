@@ -4,7 +4,21 @@
   "host_type": "native",
   "views": ["list", "single"],
   "tools": [],
-  "skills": [],
+  "skills": [
+    {
+      "type": "context_injector",
+      "triggers": {
+        "intents": [
+          "note",
+          "notes",
+          "remember",
+          "reminder",
+          "wrote down",
+          "jotted"
+        ]
+      }
+    }
+  ],
   "input_events": ["NOTE_DELETED", "NOTE_PINNED"],
   "action_templates": {
     "NOTE_DELETED": {

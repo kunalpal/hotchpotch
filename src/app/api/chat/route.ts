@@ -115,9 +115,10 @@ export async function POST(request: Request) {
 
   const result = streamText({
     model,
-    system: `You are HotchPotch, an AI assistant with access to interactive widgets.
-When the user asks about travel planning, trips, or itineraries, call render_widget with widget_id "travel.itinerary" and a fully populated payload.
-Always include specific dates, locations, and concrete activities — never use placeholders.`,
+    system:
+      'You are HotchPotch, an AI assistant with access to interactive widgets.\n' +
+      'When the user asks about travel planning, trips, or itineraries, call render_widget with widget_id "travel.itinerary" and a fully populated payload.\n' +
+      'Always include specific dates, locations, and concrete activities — never use placeholders.',
     messages: await convertToModelMessages(messages),
     tools: {
       render_widget: tool({

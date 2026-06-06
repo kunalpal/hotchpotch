@@ -34,17 +34,17 @@ export default function Home() {
     return (
       <div className="flex min-h-screen flex-col items-center">
         <div className="flex flex-1 items-center">
-          <section className="relative bg-linear-to-b from-background to-background/80 py-20 md:py-28 lg:py-36">
-            <div className="container relative z-10 space-y-10 px-8 md:px-6">
+          <section className="from-background to-background/80 relative bg-linear-to-b py-20 md:py-28 lg:py-36">
+            <div className="relative z-10 container space-y-10 px-8 md:px-6">
               <div className="mx-auto flex max-w-3xl flex-col items-center space-y-4 text-center">
                 <div className="mb-4">
                   <LandingIllustration className="h-48 w-auto md:h-64" />
                   <Separator />
                 </div>
                 <Logo className="mb-1" size="md" showIcon={false} />
-                <div className="mb-1 h-0.75 w-4 rounded-full bg-primary" />
+                <div className="bg-primary mb-1 h-0.75 w-4 rounded-full" />
 
-                <p className="mx-auto max-w-2xl text-base text-muted-foreground">
+                <p className="text-muted-foreground mx-auto max-w-2xl text-base">
                   A personal playground for experiments, ideas, and digital
                   creations.
                 </p>
@@ -65,7 +65,7 @@ export default function Home() {
               </div>
             </div>
           </section>
-          <div className="fixed right-2 top-2">
+          <div className="fixed top-2 right-2">
             <ModeToggle />
           </div>
         </div>

@@ -32,12 +32,7 @@ import { getSessionCookie } from 'better-auth/cookies';
  * - /not-authorized — Shown when a user is authenticated but not allowlisted
  * - /api/auth       — Better Auth endpoints (handles login/logout/callback flows)
  */
-const PUBLIC_PATHS = [
-  '/',
-  '/sign-in',
-  '/not-authorized',
-  '/api/auth',
-];
+const PUBLIC_PATHS = ['/', '/sign-in', '/not-authorized', '/api/auth'];
 
 /**
  * Defense-in-depth headers injected on every response.

@@ -10,6 +10,7 @@ import { IframeWidgetHost } from '@/lib/runtime/iframe-widget-host';
 import { NativeWidgetHost } from '@/lib/runtime/native-widget-host';
 import { PendingContextBuffer } from '@/lib/runtime/pending-context-buffer';
 import { ToolDispatcher } from '@/lib/runtime/tool-dispatcher';
+import { SkillRouter } from '@/lib/runtime/skill-router';
 import { validateAction } from '@/lib/runtime/injection-guard';
 import { renderTemplate } from '@/lib/runtime/template-renderer';
 
@@ -19,6 +20,7 @@ export class RuntimeManager {
   private messageListener: ((event: MessageEvent) => void) | null = null;
 
   readonly toolDispatcher = new ToolDispatcher();
+  readonly skillRouter = new SkillRouter(this.hosts);
 
   onWidgetReady: ((panelId: string) => void) | null = null;
   onWidgetFailed: ((panelId: string) => void) | null = null;
@@ -184,8 +186,11 @@ export class RuntimeManager {
       case 'TOOL_RESULT':
         this.toolDispatcher.handleToolResult(envelope);
         break;
+      case 'SKILL_RESULT':
+        this.skillRouter.handleSkillResult(envelope);
+        break;
       case 'REGISTER_SKILLS':
-        // Phase 3+ Skills — no-op until Task 28
+        // Skills are declared in the manifest; REGISTER_SKILLS is informational only
         break;
     }
   }

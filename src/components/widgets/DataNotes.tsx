@@ -1,6 +1,6 @@
 'use client';
 
-import { useId, useRef, useState } from 'react';
+import { useId, useLayoutEffect, useRef, useState } from 'react';
 import { useWidgetHost } from '@/lib/hooks/use-widget-host';
 import type { NativeWidgetHost } from '@/lib/runtime/native-widget-host';
 
@@ -18,9 +18,40 @@ interface Note {
 let noteCounter = 0;
 
 export function DataNotes({ host }: Props) {
-  // Notes doesn't receive a payload from the model — it manages its own state
-  const { sendAction } = useWidgetHost(host);
   const [notes, setNotes] = useState<Note[]>([]);
+  // Keep a ref so the SKILL_INVOKE handler can always read the latest notes
+  const notesRef = useRef(notes);
+  // Updated outside render (react-hooks/refs)
+  useLayoutEffect(() => {
+    notesRef.current = notes;
+  });
+
+  // Notes doesn't receive a payload from the model — it manages its own state.
+  // The host is also used to receive SKILL_INVOKE for context_injector.
+  const { sendAction } = useWidgetHost(host, (envelope) => {
+    if (envelope.type !== 'SKILL_INVOKE') return;
+    const { skill_id, type } = envelope.payload as {
+      skill_id: string;
+      type: string;
+    };
+    if (type !== 'context_injector') return;
+
+    // Return a summary of pinned notes as context for the system prompt
+    const pinnedNotes = notesRef.current.filter((n) => n.pinned);
+    const summary =
+      pinnedNotes.length > 0
+        ? `Pinned notes: ${pinnedNotes.map((n) => `"${n.title}"${n.body ? ` — ${n.body}` : ''}`).join('; ')}`
+        : '';
+
+    host.receiveFromWidget({
+      protocol: 'HOTCHPOTCH_WIDGET_V1' as const,
+      message_id: crypto.randomUUID(),
+      reply_to: null,
+      type: 'SKILL_RESULT',
+      timestamp: Date.now(),
+      payload: { skill_id, type: 'context_injector', result: summary },
+    });
+  });
   const formId = useId();
   const titleRef = useRef<HTMLInputElement>(null);
   const bodyRef = useRef<HTMLTextAreaElement>(null);

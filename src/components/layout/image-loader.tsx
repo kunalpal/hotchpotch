@@ -31,6 +31,7 @@ export function ImageLoader({
   // Use useLayoutEffect to check for cached images before paint and avoid flicker
   React.useLayoutEffect(() => {
     if (!src) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setStatus('error');
       return;
     }

@@ -137,6 +137,7 @@ export const FileUploader = forwardRef<
           movePrev();
         } else if (e.key === 'Enter' || e.key === 'Space') {
           if (activeIndex === -1) {
+            // eslint-disable-next-line react-hooks/immutability
             dropzoneState.inputRef.current?.click();
           }
         } else if (e.key === 'Delete' || e.key === 'Backspace') {
@@ -209,6 +210,7 @@ export const FileUploader = forwardRef<
     useEffect(() => {
       if (!value) return;
       if (value.length === maxFiles) {
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setIsLOF(true);
         return;
       }

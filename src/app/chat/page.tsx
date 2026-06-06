@@ -98,22 +98,32 @@ export default function ChatPage() {
     ]);
   }, []);
 
-  // Pre-send hook: call the selection API and mount any newly selected widgets
+  // Pre-send hook: widget selection + context injectors.
+  // Returns context lines to include in the system prompt for this turn.
   const onBeforeSend = useCallback(
-    async (message: string) => {
+    async (message: string): Promise<string[]> => {
+      // Widget selection (add-only; failures are non-fatal)
       try {
         const res = await fetch('/api/select-widgets', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ message }),
         });
-        if (!res.ok) return;
-        const { widget_ids } = (await res.json()) as { widget_ids: string[] };
-        for (const id of widget_ids) {
-          mountNativePanel(id);
+        if (res.ok) {
+          const { widget_ids } = (await res.json()) as { widget_ids: string[] };
+          for (const id of widget_ids) mountNativePanel(id);
         }
       } catch {
-        // Selection failure is non-fatal — the conversation continues without new widgets
+        // non-fatal
+      }
+
+      // Context injectors (skill-based; failures are non-fatal)
+      try {
+        return await runtimeManagerRef.current.skillRouter.runContextInjectors(
+          message
+        );
+      } catch {
+        return [];
       }
     },
     [mountNativePanel]

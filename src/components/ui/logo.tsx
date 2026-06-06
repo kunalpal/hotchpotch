@@ -35,7 +35,9 @@ export function Logo({
   ) : null;
 
   const TextComponent = showText ? (
-    <span className={`font-serif tracking-wide ${textSizes[size]}`}>HotchPotch</span>
+    <span className={`font-serif tracking-wide ${textSizes[size]}`}>
+      HotchPotch
+    </span>
   ) : null;
 
   const content = (
