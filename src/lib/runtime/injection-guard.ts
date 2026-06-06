@@ -33,9 +33,10 @@ export function validateAction(
   event: MessageEvent,
   registry: WidgetRegistry
 ): ValidatedAction | null {
+  const source = event.source as Window | null;
   const record = registry
     .getAll()
-    .find((r) => r.origin === event.origin && r.status === 'ready');
+    .find((r) => r.iframeRef.contentWindow === source && r.status === 'ready');
   if (!record) return null;
 
   const parsed = ActionEnvelopeSchema.safeParse(event.data);

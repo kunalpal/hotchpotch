@@ -117,6 +117,14 @@ export class RuntimeManager {
     )
       return;
 
+    // Reject messages not originating from a registered iframe window.
+    // This prevents any same-origin script from spoofing widget events.
+    const source = event.source as Window | null;
+    const isKnownSource = this.registry
+      .getAll()
+      .some((r) => r.iframeRef.contentWindow === source);
+    if (!isKnownSource) return;
+
     const parsed = InboundEnvelopeSchema.safeParse(event.data);
     if (!parsed.success) {
       console.warn('[RuntimeManager] Invalid envelope:', parsed.error.issues);
@@ -127,7 +135,7 @@ export class RuntimeManager {
 
     switch (envelope.type) {
       case 'READY':
-        this.handleReady(event.origin);
+        this.handleReady(source);
         break;
       case 'ACTION':
         this.handleAction(event);
@@ -139,10 +147,12 @@ export class RuntimeManager {
     }
   }
 
-  private handleReady(origin: string): void {
+  private handleReady(source: Window | null): void {
     const record = this.registry
       .getAll()
-      .find((r) => r.origin === origin && r.status === 'loading');
+      .find(
+        (r) => r.iframeRef.contentWindow === source && r.status === 'loading'
+      );
     if (!record) return;
 
     this.registry.setReady(record.panelId);
