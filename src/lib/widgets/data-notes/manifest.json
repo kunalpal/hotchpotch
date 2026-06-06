@@ -17,6 +17,21 @@
           "jotted"
         ]
       }
+    },
+    {
+      "type": "intent_interceptor",
+      "triggers": {
+        "intents": [
+          "note this",
+          "add a note",
+          "add note",
+          "jot down",
+          "write this down",
+          "save this",
+          "remember this",
+          "add to notes"
+        ]
+      }
     }
   ],
   "input_events": ["NOTE_DELETED", "NOTE_PINNED"],

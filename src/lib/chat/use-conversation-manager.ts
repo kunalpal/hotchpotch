@@ -28,60 +28,62 @@ export function useConversationManager(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const addToolResultRef = useRef<((params: any) => void) | null>(null);
 
-  const { messages, sendMessage, status, addToolResult } = useChat({
-    onToolCall({ toolCall }) {
-      if (toolCall.toolName === 'render_widget') {
-        const { widget_id, update_strategy, payload } = toolCall.input as {
-          widget_id: string;
-          update_strategy?: 'mount' | 'replace';
-          payload: unknown;
-        };
-        activePanelId.current = widget_id;
-        runtimeManagerRef.current.onRenderWidget(
-          widget_id,
-          payload,
-          update_strategy ?? 'mount'
+  const { messages, sendMessage, status, addToolResult, setMessages } = useChat(
+    {
+      onToolCall({ toolCall }) {
+        if (toolCall.toolName === 'render_widget') {
+          const { widget_id, update_strategy, payload } = toolCall.input as {
+            widget_id: string;
+            update_strategy?: 'mount' | 'replace';
+            payload: unknown;
+          };
+          activePanelId.current = widget_id;
+          runtimeManagerRef.current.onRenderWidget(
+            widget_id,
+            payload,
+            update_strategy ?? 'mount'
+          );
+          return;
+        }
+
+        // Widget-registered tool call — dispatch and resolve via addToolResult
+        const parsed = ToolDispatcher.parseNamespace(toolCall.toolName);
+        if (!parsed) return;
+
+        const rm = runtimeManagerRef.current;
+        const host = rm.getHost(parsed.panelId);
+        if (!host) return;
+
+        const toolDef = host.manifest.tools.find(
+          (t) => t.name === parsed.toolName
         );
-        return;
-      }
+        const timeoutMs = toolDef?.timeout_ms ?? 30000;
+        const toolName = toolCall.toolName;
+        const toolCallId = toolCall.toolCallId;
 
-      // Widget-registered tool call — dispatch and resolve via addToolResult
-      const parsed = ToolDispatcher.parseNamespace(toolCall.toolName);
-      if (!parsed) return;
-
-      const rm = runtimeManagerRef.current;
-      const host = rm.getHost(parsed.panelId);
-      if (!host) return;
-
-      const toolDef = host.manifest.tools.find(
-        (t) => t.name === parsed.toolName
-      );
-      const timeoutMs = toolDef?.timeout_ms ?? 30000;
-      const toolName = toolCall.toolName;
-      const toolCallId = toolCall.toolCallId;
-
-      rm.toolDispatcher
-        .dispatch(
-          toolCallId,
-          parsed.panelId,
-          parsed.toolName,
-          toolCall.input,
-          timeoutMs,
-          host
-        )
-        .then((output) => {
-          addToolResultRef.current?.({ tool: toolName, toolCallId, output });
-        })
-        .catch((err: unknown) => {
-          addToolResultRef.current?.({
-            tool: toolName,
+        rm.toolDispatcher
+          .dispatch(
             toolCallId,
-            state: 'output-error',
-            errorText: String(err),
+            parsed.panelId,
+            parsed.toolName,
+            toolCall.input,
+            timeoutMs,
+            host
+          )
+          .then((output) => {
+            addToolResultRef.current?.({ tool: toolName, toolCallId, output });
+          })
+          .catch((err: unknown) => {
+            addToolResultRef.current?.({
+              tool: toolName,
+              toolCallId,
+              state: 'output-error',
+              errorText: String(err),
+            });
           });
-        });
-    },
-  });
+      },
+    }
+  );
 
   // Sync addToolResult into a ref after each render so the onToolCall closure
   // always has the latest version without reading it during render.
@@ -123,6 +125,35 @@ export function useConversationManager(
       setInput('');
 
       const doSend = async () => {
+        // Check for intent interceptors first. If a mounted widget handles this
+        // intent fully, inject a synthetic turn and skip the model call entirely.
+        const rm = runtimeManagerRef.current;
+        const intercepted = await rm.skillRouter.runInterceptors(trimmed);
+        if (intercepted) {
+          const userMsg = {
+            id: generateId(),
+            role: 'user' as const,
+            content: trimmed,
+            parts: [{ type: 'text' as const, text: trimmed }],
+          };
+          const assistantMsg = {
+            id: generateId(),
+            role: 'assistant' as const,
+            content: intercepted.response,
+            parts: [{ type: 'text' as const, text: intercepted.response }],
+          };
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          setMessages((prev: any[]) => [...prev, userMsg, assistantMsg]);
+          if (intercepted.widgetPayload !== null) {
+            rm.onRenderWidget(
+              intercepted.panelId,
+              intercepted.widgetPayload,
+              'replace'
+            );
+          }
+          return;
+        }
+
         // Run pre-send hook (widget selection + context injectors)
         const contextLines = onBeforeSend ? await onBeforeSend(trimmed) : [];
 
@@ -153,7 +184,7 @@ export function useConversationManager(
 
       void doSend();
     },
-    [input, status, sendMessage, runtimeManagerRef, onBeforeSend]
+    [input, status, sendMessage, setMessages, runtimeManagerRef, onBeforeSend]
   );
 
   const injectTurn = useCallback(

@@ -27,30 +27,68 @@ export function DataNotes({ host }: Props) {
   });
 
   // Notes doesn't receive a payload from the model — it manages its own state.
-  // The host is also used to receive SKILL_INVOKE for context_injector.
+  // The host is also used to receive SKILL_INVOKE for context_injector and intent_interceptor.
   const { sendAction } = useWidgetHost(host, (envelope) => {
     if (envelope.type !== 'SKILL_INVOKE') return;
-    const { skill_id, type } = envelope.payload as {
+    const { skill_id, type, query } = envelope.payload as {
       skill_id: string;
       type: string;
+      query: unknown;
     };
-    if (type !== 'context_injector') return;
 
-    // Return a summary of pinned notes as context for the system prompt
-    const pinnedNotes = notesRef.current.filter((n) => n.pinned);
-    const summary =
-      pinnedNotes.length > 0
-        ? `Pinned notes: ${pinnedNotes.map((n) => `"${n.title}"${n.body ? ` — ${n.body}` : ''}`).join('; ')}`
-        : '';
+    if (type === 'context_injector') {
+      const pinnedNotes = notesRef.current.filter((n) => n.pinned);
+      const summary =
+        pinnedNotes.length > 0
+          ? `Pinned notes: ${pinnedNotes.map((n) => `"${n.title}"${n.body ? ` — ${n.body}` : ''}`).join('; ')}`
+          : '';
+      host.receiveFromWidget({
+        protocol: 'HOTCHPOTCH_WIDGET_V1' as const,
+        message_id: crypto.randomUUID(),
+        reply_to: null,
+        type: 'SKILL_RESULT',
+        timestamp: Date.now(),
+        payload: { skill_id, type: 'context_injector', result: summary },
+      });
+    } else if (type === 'intent_interceptor') {
+      const queryText = typeof query === 'string' ? query : '';
+      // Strip common imperative prefixes to extract just the note content
+      const content =
+        queryText
+          .replace(
+            /^(note this|add a note|add note|jot down|write this down|save this|remember this|add to notes)[:\s]*/i,
+            ''
+          )
+          .trim() || queryText.trim();
 
-    host.receiveFromWidget({
-      protocol: 'HOTCHPOTCH_WIDGET_V1' as const,
-      message_id: crypto.randomUUID(),
-      reply_to: null,
-      type: 'SKILL_RESULT',
-      timestamp: Date.now(),
-      payload: { skill_id, type: 'context_injector', result: summary },
-    });
+      const noteTitle = content.slice(0, 80) || 'Note';
+      const noteBody = content.length > 80 ? content.slice(80).trim() : '';
+      setNotes((prev) => [
+        ...prev,
+        {
+          id: String(++noteCounter),
+          title: noteTitle,
+          body: noteBody,
+          pinned: false,
+        },
+      ]);
+
+      host.receiveFromWidget({
+        protocol: 'HOTCHPOTCH_WIDGET_V1' as const,
+        message_id: crypto.randomUUID(),
+        reply_to: null,
+        type: 'SKILL_RESULT',
+        timestamp: Date.now(),
+        payload: {
+          skill_id,
+          type: 'intent_interceptor',
+          result: {
+            response: `Got it — I've added a note: "${noteTitle}"`,
+            payload: null,
+          },
+        },
+      });
+    }
   });
   const formId = useId();
   const titleRef = useRef<HTMLInputElement>(null);
