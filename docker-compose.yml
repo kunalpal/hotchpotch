@@ -1,0 +1,75 @@
+services:
+  localstack:
+    container_name: hotchpotch-localstack
+    image: localstack/localstack:latest
+    ports:
+      - '127.0.0.1:4566:4566' # LocalStack Gateway
+      - '127.0.0.1:4510-4559:4510-4559' # external services port range
+    environment:
+      - SERVICES=s3,lambda,iam,sts
+      - DEBUG=${DEBUG:-0}
+      - DOCKER_HOST=unix:///var/run/docker.sock
+      - AWS_DEFAULT_REGION=eu-central-1
+    volumes:
+      - localstack_data:/var/lib/localstack
+
+  localstack-init:
+    image: localstack/localstack:latest
+    container_name: hotchpotch-localstack-init
+    depends_on:
+      - localstack
+    environment:
+      - AWS_DEFAULT_REGION=eu-central-1
+      - AWS_ACCESS_KEY_ID=test
+      - AWS_SECRET_ACCESS_KEY=test
+      - AWS_ENDPOINT_URL=http://localstack:4566
+    entrypoint: /bin/bash
+    command:
+      - -c
+      - |
+        set -e
+
+        echo '=== Waiting for LocalStack to be ready ==='
+        for i in $(seq 1 30); do
+          if curl -sf http://localstack:4566/_localstack/health > /dev/null 2>&1; then
+            echo 'LocalStack is ready!'
+            break
+          fi
+          echo "Waiting for LocalStack... ($i/30)"
+          sleep 2
+        done
+
+        echo '=== Creating S3 bucket ==='
+        # Using aws with --endpoint-url instead of awslocal to be explicit
+        aws --endpoint-url=http://localstack:4566 s3api head-bucket --bucket hotchpotch-dev-files || \
+        aws --endpoint-url=http://localstack:4566 s3 mb s3://hotchpotch-dev-files
+
+        aws --endpoint-url=http://localstack:4566 s3api put-bucket-cors --bucket hotchpotch-dev-files --cors-configuration '{
+          "CORSRules": [
+            {
+              "AllowedOrigins": ["*"],
+              "AllowedMethods": ["GET", "PUT", "POST", "DELETE", "HEAD"],
+              "AllowedHeaders": ["*"],
+              "ExposeHeaders": ["ETag", "Content-Length", "Content-Type", "x-amz-server-side-encryption", "x-amz-request-id", "x-amz-id-2"],
+              "MaxAgeSeconds": 3600
+            }
+          ]
+        }'
+
+        echo '=== LocalStack resources initialized successfully ==='
+
+  db:
+    image: postgres:16-alpine
+    container_name: hotchpotch-db
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=password
+      - POSTGRES_DB=hotchpotch
+    ports:
+      - '5432:5432'
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+volumes:
+  localstack_data:
+  postgres_data:

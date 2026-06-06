@@ -6,6 +6,8 @@ const envSchema = z.object({
   BETTER_AUTH_SECRET: z.string().min(1, 'BETTER_AUTH_SECRET is required'),
   BETTER_AUTH_URL: z.url('BETTER_AUTH_URL must be a valid URL'),
   NEXT_PUBLIC_SITE_URL: z.url('NEXT_PUBLIC_SITE_URL must be a valid URL'),
+  GOOGLE_CLIENT_ID: z.string().min(1, 'GOOGLE_CLIENT_ID is required'),
+  GOOGLE_CLIENT_SECRET: z.string().min(1, 'GOOGLE_CLIENT_SECRET is required'),
   // Optional when MOCK_AI=true; the gateway provider itself will error at call-time if missing
   AI_GATEWAY_API_KEY: z.string().default(''),
   // Optional with defaults
@@ -34,6 +36,9 @@ function validateEnv(): Env {
       BETTER_AUTH_URL: process.env.BETTER_AUTH_URL ?? 'http://localhost:3000',
       NEXT_PUBLIC_SITE_URL:
         process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:3000',
+      GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID ?? 'build-placeholder',
+      GOOGLE_CLIENT_SECRET:
+        process.env.GOOGLE_CLIENT_SECRET ?? 'build-placeholder',
     } as unknown as Env;
     return _env;
   }
