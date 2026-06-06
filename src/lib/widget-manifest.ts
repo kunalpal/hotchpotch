@@ -18,7 +18,8 @@ export const ActionTemplateSchema = z.object({
 export const WidgetManifestSchema = z.object({
   widget_id: z.string(),
   name: z.string(),
-  entry: z.string(),
+  host_type: z.enum(['iframe', 'native']).default('iframe'),
+  entry: z.string().optional(),
   payload_schema: z.string().optional(),
   views: z.array(z.string()),
   tools: z

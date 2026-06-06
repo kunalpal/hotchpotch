@@ -1,5 +1,7 @@
-import { ActionEnvelopeSchema, PROTOCOL_VERSION } from '@/lib/widget-protocol';
-import type { WidgetRegistry } from '@/lib/runtime/widget-registry';
+import { PROTOCOL_VERSION } from '@/lib/widget-protocol';
+import type { InboundEnvelope } from '@/lib/widget-protocol';
+import type { WidgetHost } from '@/lib/runtime/widget-host';
+import { IframeWidgetHost } from '@/lib/runtime/iframe-widget-host';
 import type { ActionTemplate } from '@/lib/widget-manifest';
 
 const INJECTION_PREFIXES = [
@@ -30,13 +32,12 @@ function sanitiseString(value: string, maxLength?: number): string | null {
   return s;
 }
 
-function sendError(
-  win: Window,
-  origin: string,
+function sendIframeError(
+  host: IframeWidgetHost,
   code: string,
   message: string
 ): void {
-  win.postMessage(
+  host.iframeRef.contentWindow?.postMessage(
     {
       protocol: PROTOCOL_VERSION,
       message_id: crypto.randomUUID(),
@@ -45,38 +46,41 @@ function sendError(
       timestamp: Date.now(),
       payload: { code, message },
     },
-    origin
+    host.origin
   );
 }
 
+/**
+ * Validates and sanitises an inbound ACTION envelope.
+ *
+ * Steps 1–2 (origin + protocol) are enforced upstream:
+ * - IframeWidgetHost.validateOrigin() checked before delivery
+ * - ActionEnvelopeSchema enforces protocol via discriminated union
+ *
+ * Steps 3–6 (manifest membership, schema, sanitisation, injection-prefix)
+ * apply to both iframe and native hosts.
+ */
 export function validateAction(
-  event: MessageEvent,
-  registry: WidgetRegistry
+  panelId: string,
+  envelope: InboundEnvelope,
+  hosts: Map<string, WidgetHost>
 ): ValidatedAction | null {
-  const source = event.source as Window | null;
-  const record = registry
-    .getAll()
-    .find((r) => r.iframeRef.contentWindow === source && r.status === 'ready');
-  if (!record) return null;
+  if (envelope.type !== 'ACTION') return null;
 
-  // Step 1: origin must match the registered iframe origin
-  if (event.origin !== record.origin) return null;
+  const host = hosts.get(panelId);
+  if (!host || host.status !== 'ready') return null;
 
-  // Step 2: protocol check is enforced by ActionEnvelopeSchema (protocol: literal)
-  const parsed = ActionEnvelopeSchema.safeParse(event.data);
-  if (!parsed.success) return null;
-
-  const { action_type, data } = parsed.data.payload;
+  const { action_type, data } = envelope.payload;
 
   // Step 3: action_type must be declared in the manifest
-  if (!record.manifest.input_events.includes(action_type)) {
+  if (!host.manifest.input_events.includes(action_type)) {
     console.warn(
-      `[InjectionGuard] Unknown action_type "${action_type}" from panel ${record.panelId}`
+      `[InjectionGuard] Unknown action_type "${action_type}" from panel ${panelId}`
     );
     return null;
   }
 
-  const template = record.manifest.action_templates[action_type];
+  const template = host.manifest.action_templates[action_type];
   if (!template) return null;
 
   // Steps 4–6: schema validation, sanitisation, injection-prefix check
@@ -84,14 +88,9 @@ export function validateAction(
   for (const [key, fieldSchema] of Object.entries(template.schema)) {
     const value = data[key];
     if (value === undefined || value === null) {
-      // Step 4: notify widget of schema mismatch rather than silently dropping
-      if (source) {
-        sendError(
-          source,
-          record.origin,
-          'SCHEMA_ERROR',
-          `Missing required field: ${key}`
-        );
+      // Step 4: notify iframe widgets of schema errors; native errors are in-process
+      if (host instanceof IframeWidgetHost) {
+        sendIframeError(host, 'SCHEMA_ERROR', `Missing required field: ${key}`);
       }
       return null;
     }
@@ -99,10 +98,10 @@ export function validateAction(
     // Step 5: strip HTML, strip newlines, truncate
     const sanitised = sanitiseString(String(value), fieldSchema.max_length);
 
-    // Step 6: injection-prefix heuristic — silent drop, no error sent to widget
+    // Step 6: injection-prefix heuristic — silent drop
     if (sanitised === null) {
       console.warn(
-        `[InjectionGuard] Injection attempt detected in field "${key}" from panel ${record.panelId}`
+        `[InjectionGuard] Injection attempt detected in field "${key}" from panel ${panelId}`
       );
       return null;
     }
@@ -111,7 +110,7 @@ export function validateAction(
   }
 
   return {
-    panelId: record.panelId,
+    panelId,
     actionType: action_type,
     sanitisedData,
     template,

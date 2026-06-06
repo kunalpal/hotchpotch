@@ -1,22 +1,36 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import type { ComponentType } from 'react';
 import type { UIMessage } from 'ai';
 import type { WidgetManifest } from '@/lib/widget-manifest';
 import { RuntimeManager } from '@/lib/runtime/runtime-manager';
 import { ManifestLoader } from '@/lib/widget-manifest';
+import type { NativeWidgetHost } from '@/lib/runtime/native-widget-host';
 import { useConversationManager } from '@/lib/chat/use-conversation-manager';
 
 const PANEL_ID = 'travel.itinerary';
 const MANIFEST_URL = '/widgets/travel-itinerary/manifest.json';
 const WIDGET_SRC = '/widgets/travel-itinerary/index.html';
 
+/**
+ * Registry of native widget React components, keyed by widget_id.
+ * Populated incrementally as each native widget is implemented (Tasks 22–24).
+ */
+const NATIVE_WIDGET_COMPONENTS: Record<
+  string,
+  ComponentType<{ host: NativeWidgetHost }>
+> = {};
+
 interface PanelEntry {
   panelId: string;
   displayName: string;
-  /** undefined until mountWidget registers, then set to trigger iframe load */
+  hostType: 'iframe' | 'native';
+  /** iframe only — undefined until mountIframeWidget registers, then set to trigger load */
   src: string | undefined;
-  /** true once onRenderWidgetStarted fires — controls iframe visibility */
+  /** native only — the NativeWidgetHost instance for this panel */
+  nativeHost: NativeWidgetHost | undefined;
+  /** true once onRenderWidgetStarted fires — controls visibility */
   hasContent: boolean;
   busy: boolean;
   /** briefly true when a background tool completes — drives the tab pulse animation */
@@ -92,13 +106,12 @@ export default function ChatPage() {
             const pending = pendingMountsRef.current.get(panelId);
             if (pending) {
               pendingMountsRef.current.delete(panelId);
-              // mountWidget registers BEFORE src is set, so READY arrives to an
-              // already-registered entry — no handshake race condition.
-              runtimeManagerRef.current.mountWidget(
+              // mountIframeWidget registers BEFORE src is set, so READY arrives
+              // to an already-registered entry — no handshake race condition.
+              runtimeManagerRef.current.mountIframeWidget(
                 panelId,
                 el,
                 pending.manifest,
-                null,
                 pending.widgetSrc
               );
               setPanels((prev) =>
@@ -176,7 +189,9 @@ export default function ChatPage() {
           {
             panelId: PANEL_ID,
             displayName: manifest.name,
+            hostType: 'iframe',
             src: undefined,
+            nativeHost: undefined,
             hasContent: false,
             busy: false,
             pulsing: false,
@@ -462,11 +477,9 @@ export default function ChatPage() {
             );
           })()}
 
-          {/* All iframes kept in DOM to preserve state; shown/hidden via display.
-              getIframeRefCallback accesses iframeRefCallbacks.current (a ref) to
-              return a stable callback per panelId — the React-recommended pattern
-              for dynamic ref lists. The Map is read here during render only to
-              retrieve the stable function reference, not to read render-affecting state. */}
+          {/* All panels kept in DOM to preserve state; shown/hidden via display.
+              Iframe panels use a stable callback-ref pattern (React-recommended for
+              dynamic ref lists). Native panels render their component directly. */}
           {/* eslint-disable react-hooks/refs */}
           {panels.map((panel) => {
             const isActive = panel.panelId === effectiveActivePanelId;
@@ -487,6 +500,32 @@ export default function ChatPage() {
               }
             }
 
+            const positionStyle = {
+              position: 'absolute' as const,
+              top: 0,
+              bottom: 0,
+              left,
+              width,
+              border: 'none',
+              borderLeft,
+              display: show ? 'block' : 'none',
+            };
+
+            if (panel.hostType === 'native' && panel.nativeHost) {
+              const NativeComponent =
+                NATIVE_WIDGET_COMPONENTS[panel.panelId] ??
+                NATIVE_WIDGET_COMPONENTS[panel.nativeHost.manifest.widget_id];
+              if (!NativeComponent) return null;
+              return (
+                <div
+                  key={panel.panelId}
+                  style={{ ...positionStyle, overflow: 'auto' }}
+                >
+                  <NativeComponent host={panel.nativeHost} />
+                </div>
+              );
+            }
+
             return (
               <iframe
                 key={panel.panelId}
@@ -494,16 +533,7 @@ export default function ChatPage() {
                 src={panel.src}
                 title={panel.displayName}
                 sandbox="allow-scripts allow-forms"
-                style={{
-                  position: 'absolute',
-                  top: 0,
-                  bottom: 0,
-                  left,
-                  width,
-                  border: 'none',
-                  borderLeft,
-                  display: show ? 'block' : 'none',
-                }}
+                style={positionStyle}
               />
             );
           })}

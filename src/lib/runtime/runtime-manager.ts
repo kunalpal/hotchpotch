@@ -3,16 +3,17 @@ import {
   InboundEnvelopeSchema,
   WIDGET_PAYLOAD_SCHEMAS,
 } from '@/lib/widget-protocol';
+import type { InboundEnvelope } from '@/lib/widget-protocol';
 import type { WidgetManifest } from '@/lib/widget-manifest';
-import { WidgetRegistry } from '@/lib/runtime/widget-registry';
+import type { WidgetHost } from '@/lib/runtime/widget-host';
+import { IframeWidgetHost } from '@/lib/runtime/iframe-widget-host';
+import { NativeWidgetHost } from '@/lib/runtime/native-widget-host';
 import { PendingContextBuffer } from '@/lib/runtime/pending-context-buffer';
 import { validateAction } from '@/lib/runtime/injection-guard';
 import { renderTemplate } from '@/lib/runtime/template-renderer';
 
-const READY_TIMEOUT_MS = 3000;
-
 export class RuntimeManager {
-  private registry = new WidgetRegistry();
+  private hosts = new Map<string, WidgetHost>();
   private passiveBuffers = new Map<string, PendingContextBuffer>();
   private messageListener: ((event: MessageEvent) => void) | null = null;
 
@@ -35,37 +36,36 @@ export class RuntimeManager {
     }
   }
 
-  mountWidget(
+  mountIframeWidget(
     panelId: string,
     iframeEl: HTMLIFrameElement,
     manifest: WidgetManifest,
-    initialPayload: unknown,
     widgetSrc: string
   ): void {
     const origin = new URL(widgetSrc, window.location.href).origin;
+    const host = new IframeWidgetHost(panelId, iframeEl, manifest, origin);
 
-    const timeout = setTimeout(() => {
-      this.registry.setFailed(panelId);
+    host.startReadyTimeout(() => {
+      host.status = 'failed';
       this.onWidgetFailed?.(panelId);
-    }, READY_TIMEOUT_MS);
+    });
 
-    this.registry.register(panelId, iframeEl, origin, manifest, timeout);
+    host.onMessage((envelope) => this.handleInbound(panelId, envelope));
+    this.hosts.set(panelId, host);
+    this.passiveBuffers.set(panelId, new PendingContextBuffer());
+  }
+
+  mountNativeWidget(
+    panelId: string,
+    manifest: WidgetManifest
+  ): NativeWidgetHost {
+    const host = new NativeWidgetHost(panelId, manifest);
+
+    host.onMessage((envelope) => this.handleInbound(panelId, envelope));
+    this.hosts.set(panelId, host);
     this.passiveBuffers.set(panelId, new PendingContextBuffer());
 
-    // Only pre-queue a MOUNT when a real initial payload is supplied. When
-    // null, the widget stays in its placeholder state until onRenderWidget
-    // fires with actual data, avoiding a double-render flash.
-    if (initialPayload !== null && initialPayload !== undefined) {
-      const record = this.registry.get(panelId)!;
-      record.pendingOutbound.push(
-        createEnvelope('MOUNT', {
-          widget_id: manifest.widget_id,
-          version: '1.0.0',
-          initial_payload: initialPayload,
-          context: {},
-        })
-      );
-    }
+    return host;
   }
 
   onRenderWidget(
@@ -73,12 +73,12 @@ export class RuntimeManager {
     payload: unknown,
     updateStrategy: 'mount' | 'replace'
   ): void {
-    const record = this.registry.get(panelId);
-    if (!record) return;
+    const host = this.hosts.get(panelId);
+    if (!host) return;
     this.onRenderWidgetStarted?.(panelId);
 
     // Validate payload against the widget's registered schema
-    const schema = WIDGET_PAYLOAD_SCHEMAS[record.manifest.widget_id];
+    const schema = WIDGET_PAYLOAD_SCHEMAS[host.manifest.widget_id];
     if (schema) {
       const result = schema.safeParse(payload);
       if (!result.success) {
@@ -90,27 +90,21 @@ export class RuntimeManager {
       }
     }
 
-    if (record.status === 'ready') {
-      const type = updateStrategy === 'replace' ? 'REPLACE' : 'MOUNT';
-      this.sendToWidget(panelId, createEnvelope(type, { payload }));
-    } else if (record.status === 'loading') {
-      const type = updateStrategy === 'replace' ? 'REPLACE' : 'MOUNT';
-      record.pendingOutbound.push(createEnvelope(type, { payload }));
+    const type = updateStrategy === 'replace' ? 'REPLACE' : 'MOUNT';
+    const envelope = createEnvelope(type, { payload });
+
+    if (host.status === 'ready') {
+      host.send(envelope);
+    } else if (host.status === 'loading') {
+      host.pendingOutbound.push(envelope);
     }
   }
 
   unmountWidget(panelId: string): void {
-    const record = this.registry.get(panelId);
-    if (!record) return;
-    // Clear any pending ready timeout so it can't fire after removal
-    if (record.readyTimeout) clearTimeout(record.readyTimeout);
-    if (record.status === 'ready') {
-      this.sendToWidget(
-        panelId,
-        createEnvelope('UNMOUNT', { reason: 'user_closed' })
-      );
-    }
-    this.registry.remove(panelId);
+    const host = this.hosts.get(panelId);
+    if (!host) return;
+    host.dispose();
+    this.hosts.delete(panelId);
     this.passiveBuffers.delete(panelId);
     this.onPanelUnmounted?.(panelId);
   }
@@ -119,15 +113,7 @@ export class RuntimeManager {
     return this.passiveBuffers.get(panelId)?.flush() ?? [];
   }
 
-  sendToWidget(
-    panelId: string,
-    envelope: ReturnType<typeof createEnvelope>
-  ): void {
-    const record = this.registry.get(panelId);
-    if (!record?.iframeRef.contentWindow) return;
-    record.iframeRef.contentWindow.postMessage(envelope, record.origin);
-  }
-
+  /** Global window.message handler — routes to the matching IframeWidgetHost */
   handleMessage(event: MessageEvent): void {
     if (
       !event.data ||
@@ -136,13 +122,22 @@ export class RuntimeManager {
     )
       return;
 
-    // Reject messages not originating from a registered iframe window.
-    // This prevents any same-origin script from spoofing widget events.
+    // Find the IframeWidgetHost whose iframe's contentWindow matches the sender
     const source = event.source as Window | null;
-    const isKnownSource = this.registry
-      .getAll()
-      .some((r) => r.iframeRef.contentWindow === source);
-    if (!isKnownSource) return;
+    let matchedHost: IframeWidgetHost | null = null;
+    for (const host of this.hosts.values()) {
+      if (
+        host instanceof IframeWidgetHost &&
+        host.iframeRef.contentWindow === source
+      ) {
+        matchedHost = host;
+        break;
+      }
+    }
+    if (!matchedHost) return;
+
+    // Validate origin before parsing the envelope
+    if (!matchedHost.validateOrigin(event)) return;
 
     const parsed = InboundEnvelopeSchema.safeParse(event.data);
     if (!parsed.success) {
@@ -150,44 +145,45 @@ export class RuntimeManager {
       return;
     }
 
-    const envelope = parsed.data;
+    matchedHost.deliverToHost(parsed.data);
+  }
 
+  /** Unified inbound handler called by both iframe and native hosts */
+  private handleInbound(panelId: string, envelope: InboundEnvelope): void {
     switch (envelope.type) {
       case 'READY':
-        this.handleReady(source);
+        this.handleReady(panelId);
         break;
       case 'ACTION':
-        this.handleAction(event);
+        this.handleAction(panelId, envelope);
         break;
       case 'REGISTER_TOOLS':
       case 'REGISTER_SKILLS':
-        // Phase 3+ — no-op for MVP
+        // Phase 3+ — no-op until Task 25
         break;
     }
   }
 
-  private handleReady(source: Window | null): void {
-    const record = this.registry
-      .getAll()
-      .find(
-        (r) => r.iframeRef.contentWindow === source && r.status === 'loading'
-      );
-    if (!record) return;
+  private handleReady(panelId: string): void {
+    const host = this.hosts.get(panelId);
+    if (!host || host.status !== 'loading') return;
 
-    this.registry.setReady(record.panelId);
-    this.onWidgetReady?.(record.panelId);
-
-    for (const envelope of record.pendingOutbound) {
-      this.sendToWidget(
-        record.panelId,
-        envelope as ReturnType<typeof createEnvelope>
-      );
+    if (host instanceof IframeWidgetHost) {
+      host.clearReadyTimeout();
     }
-    record.pendingOutbound = [];
+    host.status = 'ready';
+    this.onWidgetReady?.(panelId);
+
+    for (const envelope of host.pendingOutbound) {
+      host.send(envelope);
+    }
+    host.pendingOutbound = [];
   }
 
-  private handleAction(event: MessageEvent): void {
-    const validated = validateAction(event, this.registry);
+  private handleAction(panelId: string, envelope: InboundEnvelope): void {
+    if (envelope.type !== 'ACTION') return;
+
+    const validated = validateAction(panelId, envelope, this.hosts);
     if (!validated) return;
 
     let rendered: string;
@@ -204,7 +200,7 @@ export class RuntimeManager {
     if (validated.urgency === 'active') {
       this.onInjectTurn?.(`[Widget] ${rendered}`);
     } else {
-      this.passiveBuffers.get(validated.panelId)?.push(rendered);
+      this.passiveBuffers.get(panelId)?.push(rendered);
     }
   }
 }
