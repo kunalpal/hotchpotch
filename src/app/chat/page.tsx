@@ -8,6 +8,7 @@ import { RuntimeManager } from '@/lib/runtime/runtime-manager';
 import { ManifestLoader } from '@/lib/widget-manifest';
 import type { NativeWidgetHost } from '@/lib/runtime/native-widget-host';
 import { useConversationManager } from '@/lib/chat/use-conversation-manager';
+import { TravelMap } from '@/components/widgets/TravelMap';
 
 const PANEL_ID = 'travel.itinerary';
 const MANIFEST_URL = '/widgets/travel-itinerary/manifest.json';
@@ -20,7 +21,9 @@ const WIDGET_SRC = '/widgets/travel-itinerary/index.html';
 const NATIVE_WIDGET_COMPONENTS: Record<
   string,
   ComponentType<{ host: NativeWidgetHost }>
-> = {};
+> = {
+  'travel.map': TravelMap,
+};
 
 interface PanelEntry {
   panelId: string;

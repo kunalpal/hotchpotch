@@ -1,0 +1,27 @@
+{
+  "widget_id": "travel.map",
+  "name": "Travel Map",
+  "host_type": "native",
+  "views": ["pins", "route"],
+  "tools": [],
+  "skills": [],
+  "input_events": ["LOCATION_FOCUSED", "LEG_REMOVED"],
+  "action_templates": {
+    "LOCATION_FOCUSED": {
+      "action_type": "LOCATION_FOCUSED",
+      "template": "User focused on {data.location}.",
+      "urgency": "passive",
+      "schema": {
+        "location": { "type": "string", "max_length": 100 }
+      }
+    },
+    "LEG_REMOVED": {
+      "action_type": "LEG_REMOVED",
+      "template": "User removed the leg to {data.location}.",
+      "urgency": "active",
+      "schema": {
+        "location": { "type": "string", "max_length": 100 }
+      }
+    }
+  }
+}
