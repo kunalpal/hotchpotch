@@ -57,9 +57,7 @@ export function TravelMap({ host }: Props) {
               <div className="text-muted-foreground text-xs">
                 {day.location}
               </div>
-              <div className="text-muted-foreground/70 text-[11px]">
-                {day.date}
-              </div>
+              <div className="text-muted-foreground/70 text-xs">{day.date}</div>
             </div>
             <div className="flex justify-end px-2 pb-2">
               <Button

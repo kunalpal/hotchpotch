@@ -192,7 +192,7 @@ export function DataNotes({ host }: Props) {
               </div>
             </div>
             {note.body && (
-              <p className="text-muted-foreground mt-1.5 text-[13px]">
+              <p className="text-muted-foreground mt-1.5 text-sm">
                 {note.body}
               </p>
             )}
