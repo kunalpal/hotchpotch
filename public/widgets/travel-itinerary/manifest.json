@@ -5,6 +5,15 @@
   "views": ["overview"],
   "tools": [],
   "skills": [],
-  "input_events": [],
-  "action_templates": {}
+  "input_events": ["ITINERARY_FEEDBACK"],
+  "action_templates": {
+    "ITINERARY_FEEDBACK": {
+      "action_type": "ITINERARY_FEEDBACK",
+      "template": "User reviewed the itinerary: {data.summary}",
+      "urgency": "active",
+      "schema": {
+        "summary": { "type": "string", "max_length": 500 }
+      }
+    }
+  }
 }

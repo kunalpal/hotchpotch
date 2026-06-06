@@ -16,11 +16,18 @@
         padding: 16px;
         color: #111;
         background: #fff;
+        display: flex;
+        flex-direction: column;
+        height: 100vh;
       }
       #empty {
         color: #888;
         padding: 32px 0;
         text-align: center;
+      }
+      #days {
+        flex: 1;
+        overflow-y: auto;
       }
       .day {
         border: 1px solid #e0e0e0;
@@ -34,14 +41,21 @@
         font-weight: 600;
         display: flex;
         justify-content: space-between;
+        align-items: center;
       }
       .day-header .location {
         font-weight: 400;
         color: #555;
       }
-      .activity-list {
-        list-style: none;
+      .day-body {
+        display: flex;
+        align-items: flex-start;
+        gap: 8px;
         padding: 8px 12px;
+      }
+      .activity-list {
+        flex: 1;
+        list-style: none;
       }
       .activity-list li {
         padding: 4px 0;
@@ -51,13 +65,72 @@
       .activity-list li:last-child {
         border-bottom: none;
       }
+      .rating-buttons {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        flex-shrink: 0;
+      }
+      .rating-btn {
+        background: none;
+        border: 1px solid #e0e0e0;
+        border-radius: 4px;
+        padding: 4px 8px;
+        font-size: 16px;
+        cursor: pointer;
+        line-height: 1;
+        transition:
+          background 0.1s,
+          border-color 0.1s;
+      }
+      .rating-btn:hover {
+        background: #f5f5f5;
+      }
+      .rating-btn.active-like {
+        background: #e6f4ea;
+        border-color: #34a853;
+      }
+      .rating-btn.active-dislike {
+        background: #fce8e6;
+        border-color: #ea4335;
+      }
+      #footer {
+        padding-top: 12px;
+        border-top: 1px solid #e0e0e0;
+        margin-top: 4px;
+      }
+      #send-btn {
+        width: 100%;
+        padding: 10px;
+        background: #0070f3;
+        color: #fff;
+        border: none;
+        border-radius: 6px;
+        font-size: 14px;
+        cursor: pointer;
+        transition: background 0.15s;
+      }
+      #send-btn:disabled {
+        background: #ccc;
+        cursor: default;
+      }
+      #send-btn:not(:disabled):hover {
+        background: #005fcc;
+      }
     </style>
   </head>
   <body>
-    <div id="root"><div id="empty">Waiting for itinerary…</div></div>
+    <div id="days"><div id="empty">Waiting for itinerary…</div></div>
+    <div id="footer" style="display: none">
+      <button id="send-btn" disabled>Send feedback</button>
+    </div>
 
     <script>
       const PROTOCOL = 'HOTCHPOTCH_WIDGET_V1';
+
+      let days = [];
+      // Map of day index → 'liked' | 'disliked' | null
+      const ratings = {};
 
       function send(type, payload) {
         window.parent.postMessage(
@@ -73,34 +146,110 @@
         );
       }
 
-      function render(data) {
-        const root = document.getElementById('root');
-        if (!data || !Array.isArray(data.days) || data.days.length === 0) {
-          root.innerHTML = '<div id="empty">No itinerary data.</div>';
-          return;
-        }
-        root.innerHTML = data.days
-          .map(
-            (day, i) => `
-          <div class="day" data-day="${i}">
-            <div class="day-header">
-              <span>Day ${i + 1} &mdash; ${escHtml(day.date)}</span>
-              <span class="location">${escHtml(day.location)}</span>
-            </div>
-            <ul class="activity-list">
-              ${day.activities.map((a) => `<li>${escHtml(a)}</li>`).join('')}
-            </ul>
-          </div>`
-          )
-          .join('');
-      }
-
       function escHtml(str) {
         return String(str)
           .replace(/&/g, '&amp;')
           .replace(/</g, '&lt;')
           .replace(/>/g, '&gt;')
           .replace(/"/g, '&quot;');
+      }
+
+      function updateSendButton() {
+        const hasAny = Object.values(ratings).some((r) => r !== null);
+        document.getElementById('send-btn').disabled = !hasAny;
+      }
+
+      function setRating(index, value) {
+        // Toggle off if already selected
+        ratings[index] = ratings[index] === value ? null : value;
+
+        const card = document.querySelector(`.day[data-index="${index}"]`);
+        card.querySelector('.rating-btn.like').className =
+          'rating-btn like' +
+          (ratings[index] === 'liked' ? ' active-like' : '');
+        card.querySelector('.rating-btn.dislike').className =
+          'rating-btn dislike' +
+          (ratings[index] === 'disliked' ? ' active-dislike' : '');
+
+        updateSendButton();
+      }
+
+      function renderDays() {
+        const container = document.getElementById('days');
+        const footer = document.getElementById('footer');
+
+        if (!days.length) {
+          container.innerHTML = '<div id="empty">No itinerary data.</div>';
+          footer.style.display = 'none';
+          return;
+        }
+
+        container.innerHTML = days
+          .map(
+            (day, i) => `
+          <div class="day" data-index="${i}">
+            <div class="day-header">
+              <span>Day ${i + 1} &mdash; ${escHtml(day.date)}</span>
+              <span class="location">${escHtml(day.location)}</span>
+            </div>
+            <div class="day-body">
+              <ul class="activity-list">
+                ${day.activities.map((a) => `<li>${escHtml(a)}</li>`).join('')}
+              </ul>
+              <div class="rating-buttons">
+                <button class="rating-btn like${ratings[i] === 'liked' ? ' active-like' : ''}" aria-label="Like day ${i + 1}">👍</button>
+                <button class="rating-btn dislike${ratings[i] === 'disliked' ? ' active-dislike' : ''}" aria-label="Dislike day ${i + 1}">👎</button>
+              </div>
+            </div>
+          </div>`
+          )
+          .join('');
+
+        container.querySelectorAll('.day').forEach((card) => {
+          const idx = Number(card.dataset.index);
+          card
+            .querySelector('.rating-btn.like')
+            .addEventListener('click', () => setRating(idx, 'liked'));
+          card
+            .querySelector('.rating-btn.dislike')
+            .addEventListener('click', () => setRating(idx, 'disliked'));
+        });
+
+        footer.style.display = 'block';
+        updateSendButton();
+      }
+
+      document.getElementById('send-btn').addEventListener('click', () => {
+        const parts = days
+          .map((day, i) => {
+            const r = ratings[i];
+            if (!r) return null;
+            return `Day ${i + 1} (${day.location}): ${r}`;
+          })
+          .filter(Boolean);
+
+        if (!parts.length) return;
+
+        send('ACTION', {
+          action_type: 'ITINERARY_FEEDBACK',
+          data: { summary: parts.join('. ') + '.' },
+          urgency: 'active',
+        });
+
+        // Clear ratings after sending
+        days.forEach((_, i) => {
+          ratings[i] = null;
+        });
+        renderDays();
+      });
+
+      function render(data) {
+        days = data && Array.isArray(data.days) ? data.days : [];
+        // Reset ratings when new itinerary arrives
+        days.forEach((_, i) => {
+          ratings[i] = null;
+        });
+        renderDays();
       }
 
       window.addEventListener('message', (event) => {
