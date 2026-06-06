@@ -49,16 +49,20 @@ export class RuntimeManager {
     this.registry.register(panelId, iframeEl, origin, manifest, timeout);
     this.passiveBuffers.set(panelId, new PendingContextBuffer());
 
-    // Queue MOUNT so it fires as soon as READY arrives
-    const record = this.registry.get(panelId)!;
-    record.pendingOutbound.push(
-      createEnvelope('MOUNT', {
-        widget_id: manifest.widget_id,
-        version: '1.0.0',
-        initial_payload: initialPayload,
-        context: {},
-      })
-    );
+    // Only pre-queue a MOUNT when a real initial payload is supplied. When
+    // null, the widget stays in its placeholder state until onRenderWidget
+    // fires with actual data, avoiding a double-render flash.
+    if (initialPayload !== null && initialPayload !== undefined) {
+      const record = this.registry.get(panelId)!;
+      record.pendingOutbound.push(
+        createEnvelope('MOUNT', {
+          widget_id: manifest.widget_id,
+          version: '1.0.0',
+          initial_payload: initialPayload,
+          context: {},
+        })
+      );
+    }
   }
 
   onRenderWidget(
