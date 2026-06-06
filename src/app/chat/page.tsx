@@ -16,6 +16,7 @@ export default function ChatPage() {
   const manifestLoaderRef = useRef(new ManifestLoader());
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const injectTurnRef = useRef<((content: string) => void) | null>(null);
+  const [iframeSrc, setIframeSrc] = useState<string | undefined>(undefined);
   const [widgetVisible, setWidgetVisible] = useState(false);
 
   const {
@@ -48,7 +49,14 @@ export default function ChatPage() {
       .load(MANIFEST_URL)
       .then((manifest) => {
         if (!unmounted && iframeRef.current) {
-          rm.mountWidget(PANEL_ID, iframeRef.current, manifest, null);
+          rm.mountWidget(
+            PANEL_ID,
+            iframeRef.current,
+            manifest,
+            null,
+            WIDGET_SRC
+          );
+          setIframeSrc(WIDGET_SRC);
         }
       })
       .catch((err: unknown) => {
@@ -177,7 +185,7 @@ export default function ChatPage() {
       <div style={{ flex: 1, position: 'relative' }}>
         <iframe
           ref={iframeRef}
-          src={WIDGET_SRC}
+          src={iframeSrc}
           title="Widget panel"
           style={{
             width: '100%',

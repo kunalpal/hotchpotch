@@ -37,9 +37,10 @@ export class RuntimeManager {
     panelId: string,
     iframeEl: HTMLIFrameElement,
     manifest: WidgetManifest,
-    initialPayload: unknown
+    initialPayload: unknown,
+    widgetSrc: string
   ): void {
-    const origin = new URL(iframeEl.src, window.location.href).origin;
+    const origin = new URL(widgetSrc, window.location.href).origin;
 
     const timeout = setTimeout(() => {
       this.registry.setFailed(panelId);
