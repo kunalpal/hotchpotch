@@ -7,6 +7,7 @@ import type { WidgetManifest } from '@/lib/widget-manifest';
 import { RuntimeManager } from '@/lib/runtime/runtime-manager';
 import { ManifestLoader } from '@/lib/widget-manifest';
 import type { NativeWidgetHost } from '@/lib/runtime/native-widget-host';
+import { NATIVE_MANIFESTS } from '@/lib/widget-manifest-registry';
 import { useConversationManager } from '@/lib/chat/use-conversation-manager';
 import { TravelMap } from '@/components/widgets/TravelMap';
 import { FinanceBudget } from '@/components/widgets/FinanceBudget';
@@ -62,10 +63,61 @@ export default function ChatPage() {
   const pendingMountsRef = useRef(
     new Map<string, { manifest: WidgetManifest; widgetSrc: string }>()
   );
+  // Tracks which widget IDs are already mounted (for add-only selection logic)
+  const mountedWidgetIdsRef = useRef(new Set<string>());
 
   const [panels, setPanels] = useState<PanelEntry[]>([]);
   const [activePanelId, setActivePanelId] = useState<string | null>(null);
   const [splitMode, setSplitMode] = useState(false);
+
+  // Mounts a native widget panel and registers it with the runtime
+  const mountNativePanel = useCallback((widgetId: string) => {
+    if (mountedWidgetIdsRef.current.has(widgetId)) return;
+    const manifest = NATIVE_MANIFESTS[widgetId];
+    if (!manifest) return;
+
+    mountedWidgetIdsRef.current.add(widgetId);
+    const nativeHost = runtimeManagerRef.current.mountNativeWidget(
+      widgetId,
+      manifest
+    );
+    // Native widgets become ready immediately on bind (no async handshake)
+    setPanels((prev) => [
+      ...prev,
+      {
+        panelId: widgetId,
+        displayName: manifest.name,
+        hostType: 'native',
+        src: undefined,
+        nativeHost,
+        hasContent: true,
+        busy: false,
+        pulsing: false,
+        failed: false,
+      },
+    ]);
+  }, []);
+
+  // Pre-send hook: call the selection API and mount any newly selected widgets
+  const onBeforeSend = useCallback(
+    async (message: string) => {
+      try {
+        const res = await fetch('/api/select-widgets', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ message }),
+        });
+        if (!res.ok) return;
+        const { widget_ids } = (await res.json()) as { widget_ids: string[] };
+        for (const id of widget_ids) {
+          mountNativePanel(id);
+        }
+      } catch {
+        // Selection failure is non-fatal — the conversation continues without new widgets
+      }
+    },
+    [mountNativePanel]
+  );
 
   const {
     messages,
@@ -74,7 +126,7 @@ export default function ChatPage() {
     handleSubmit,
     isLoading,
     injectTurn,
-  } = useConversationManager(runtimeManagerRef);
+  } = useConversationManager(runtimeManagerRef, onBeforeSend);
 
   useEffect(() => {
     injectTurnRef.current = injectTurn;
@@ -187,6 +239,7 @@ export default function ChatPage() {
         if (unmounted) return;
         // Queue mount before adding the panel to state. The iframe callback ref
         // fires after the element appears in the DOM and drains this queue.
+        mountedWidgetIdsRef.current.add(PANEL_ID);
         pendingMountsRef.current.set(PANEL_ID, {
           manifest,
           widgetSrc: WIDGET_SRC,

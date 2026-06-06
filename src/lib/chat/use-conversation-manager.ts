@@ -18,7 +18,8 @@ const INJECTED_PREFIX = '__injected__';
 // Accepts a ref so the hook never reads runtimeManager.current during render —
 // only inside callbacks (onToolCall, handleSubmit), satisfying react-hooks/immutability.
 export function useConversationManager(
-  runtimeManagerRef: MutableRefObject<RuntimeManager>
+  runtimeManagerRef: MutableRefObject<RuntimeManager>,
+  onBeforeSend?: (message: string) => Promise<void>
 ) {
   const [input, setInput] = useState('');
   const activePanelId = useRef<string | null>(null);
@@ -119,24 +120,32 @@ export function useConversationManager(
       const trimmed = input.trim();
       if (!trimmed || status !== 'ready') return;
 
-      let text = trimmed;
-
-      if (activePanelId.current) {
-        const buffered = runtimeManagerRef.current.flushPassiveBuffer(
-          activePanelId.current
-        );
-        if (buffered.length > 0) {
-          const context = buffered
-            .map((t) => `[Widget context: ${t}]`)
-            .join('\n');
-          text = `${context}\n\n${text}`;
-        }
-      }
-
       setInput('');
-      sendMessage({ text });
+
+      const doSend = async () => {
+        // Run pre-send hook (e.g. widget selection) before the API call
+        if (onBeforeSend) await onBeforeSend(trimmed);
+
+        let text = trimmed;
+
+        if (activePanelId.current) {
+          const buffered = runtimeManagerRef.current.flushPassiveBuffer(
+            activePanelId.current
+          );
+          if (buffered.length > 0) {
+            const context = buffered
+              .map((t) => `[Widget context: ${t}]`)
+              .join('\n');
+            text = `${context}\n\n${text}`;
+          }
+        }
+
+        sendMessage({ text });
+      };
+
+      void doSend();
     },
-    [input, status, sendMessage, runtimeManagerRef]
+    [input, status, sendMessage, runtimeManagerRef, onBeforeSend]
   );
 
   const injectTurn = useCallback(
