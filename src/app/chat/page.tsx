@@ -9,6 +9,7 @@ import { ManifestLoader } from '@/lib/widget-manifest';
 import type { NativeWidgetHost } from '@/lib/runtime/native-widget-host';
 import { useConversationManager } from '@/lib/chat/use-conversation-manager';
 import { TravelMap } from '@/components/widgets/TravelMap';
+import { FinanceBudget } from '@/components/widgets/FinanceBudget';
 
 const PANEL_ID = 'travel.itinerary';
 const MANIFEST_URL = '/widgets/travel-itinerary/manifest.json';
@@ -23,6 +24,7 @@ const NATIVE_WIDGET_COMPONENTS: Record<
   ComponentType<{ host: NativeWidgetHost }>
 > = {
   'travel.map': TravelMap,
+  'finance.budget': FinanceBudget,
 };
 
 interface PanelEntry {

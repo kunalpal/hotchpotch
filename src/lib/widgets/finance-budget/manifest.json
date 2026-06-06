@@ -1,0 +1,28 @@
+{
+  "widget_id": "finance.budget",
+  "name": "Trip Budget",
+  "host_type": "native",
+  "views": ["overview", "by_day"],
+  "tools": [{ "name": "fetch_exchange_rate", "timeout_ms": 5000 }],
+  "skills": [],
+  "input_events": ["LINE_EDITED", "CURRENCY_CHANGED"],
+  "action_templates": {
+    "LINE_EDITED": {
+      "action_type": "LINE_EDITED",
+      "template": "User updated {data.item} cost to {data.amount}.",
+      "urgency": "passive",
+      "schema": {
+        "item": { "type": "string", "max_length": 100 },
+        "amount": { "type": "string", "max_length": 20 }
+      }
+    },
+    "CURRENCY_CHANGED": {
+      "action_type": "CURRENCY_CHANGED",
+      "template": "User switched budget currency to {data.currency}.",
+      "urgency": "active",
+      "schema": {
+        "currency": { "type": "string", "max_length": 10 }
+      }
+    }
+  }
+}
