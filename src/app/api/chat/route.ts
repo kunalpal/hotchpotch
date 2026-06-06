@@ -11,8 +11,24 @@ import { env } from '@/lib/env';
 // Silence the unused import warning — env is accessed for side-effect validation
 void env;
 
+const RequestBodySchema = z.object({
+  messages: z.array(z.unknown()),
+});
+
 export async function POST(request: Request) {
-  const { messages }: { messages: UIMessage[] } = await request.json();
+  let body: unknown;
+  try {
+    body = await request.json();
+  } catch {
+    return new Response('Invalid JSON', { status: 400 });
+  }
+
+  const parsed = RequestBodySchema.safeParse(body);
+  if (!parsed.success) {
+    return new Response('messages must be an array', { status: 400 });
+  }
+
+  const messages = parsed.data.messages as UIMessage[];
 
   const result = streamText({
     model: gateway('deepseek/deepseek-v4-flash'),
