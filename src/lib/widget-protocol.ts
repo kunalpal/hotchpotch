@@ -11,7 +11,7 @@ export const EnvelopeSchema = z.object({
   reply_to: z.string().nullable(),
   type: z.string(),
   timestamp: z.number(),
-  payload: z.record(z.unknown()),
+  payload: z.record(z.string(), z.unknown()),
 });
 
 export type Envelope = z.infer<typeof EnvelopeSchema>;
@@ -42,7 +42,11 @@ export const RegisterToolsEnvelopeSchema = InboundBase.extend({
   type: z.literal('REGISTER_TOOLS'),
   payload: z.object({
     tools: z.array(
-      z.object({ name: z.string(), description: z.string().optional(), timeout_ms: z.number().optional() })
+      z.object({
+        name: z.string(),
+        description: z.string().optional(),
+        timeout_ms: z.number().optional(),
+      })
     ),
   }),
 });
@@ -58,7 +62,7 @@ export const ActionEnvelopeSchema = InboundBase.extend({
   type: z.literal('ACTION'),
   payload: z.object({
     action_type: z.string(),
-    data: z.record(z.string()),
+    data: z.record(z.string(), z.string()),
     urgency: z.enum(['active', 'passive']),
   }),
 });
@@ -75,12 +79,16 @@ export const ToolResultEnvelopeSchema = InboundBase.extend({
 
 export const SkillResultEnvelopeSchema = InboundBase.extend({
   type: z.literal('SKILL_RESULT'),
-  payload: z.object({ skill_id: z.string(), type: z.string(), result: z.unknown() }),
+  payload: z.object({
+    skill_id: z.string(),
+    type: z.string(),
+    result: z.unknown(),
+  }),
 });
 
 export const StateSnapshotEnvelopeSchema = InboundBase.extend({
   type: z.literal('STATE_SNAPSHOT'),
-  payload: z.object({ state: z.record(z.unknown()) }),
+  payload: z.object({ state: z.record(z.string(), z.unknown()) }),
 });
 
 export const HeightChangedEnvelopeSchema = InboundBase.extend({
@@ -120,7 +128,9 @@ export const TravelItineraryPayloadSchema = z.object({
   ),
 });
 
-export type TravelItineraryPayload = z.infer<typeof TravelItineraryPayloadSchema>;
+export type TravelItineraryPayload = z.infer<
+  typeof TravelItineraryPayloadSchema
+>;
 
 export const WIDGET_PAYLOAD_SCHEMAS: Record<string, z.ZodTypeAny> = {
   'travel.itinerary': TravelItineraryPayloadSchema,

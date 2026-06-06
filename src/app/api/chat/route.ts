@@ -1,4 +1,10 @@
-import { convertToModelMessages, gateway, streamText, tool, UIMessage } from 'ai';
+import {
+  convertToModelMessages,
+  gateway,
+  streamText,
+  tool,
+  UIMessage,
+} from 'ai';
 import { z } from 'zod';
 import { env } from '@/lib/env';
 
@@ -13,7 +19,7 @@ export async function POST(request: Request) {
     system: `You are HotchPotch, an AI assistant with access to interactive widgets.
 When the user asks about travel planning, trips, or itineraries, call render_widget with widget_id "travel.itinerary" and a fully populated payload.
 Always include specific dates, locations, and concrete activities — never use placeholders.`,
-    messages: convertToModelMessages(messages),
+    messages: await convertToModelMessages(messages),
     tools: {
       render_widget: tool({
         description:
@@ -25,9 +31,11 @@ Always include specific dates, locations, and concrete activities — never use 
           update_strategy: z
             .enum(['mount', 'replace'])
             .default('mount')
-            .describe('mount for first render, replace to update an existing widget'),
+            .describe(
+              'mount for first render, replace to update an existing widget'
+            ),
           payload: z
-            .record(z.unknown())
+            .record(z.string(), z.unknown())
             .describe('Data payload conforming to the widget schema'),
         }),
         execute: async ({ widget_id, update_strategy }) => {
