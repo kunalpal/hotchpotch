@@ -1,5 +1,6 @@
 import { BUILT_IN_CATALOGUE, selectWidgets } from '@/lib/widget-catalogue';
 import { env } from '@/lib/env';
+import { detectTrigger, mockWidgetIds } from '@/lib/mock/mock-responses';
 
 void env;
 
@@ -31,10 +32,10 @@ export async function POST(request: Request) {
     return new Response('message must be a string', { status: 400 });
   }
 
-  // When running with a mock AI, skip the selection call and return defaults
+  // When running with a mock AI, detect trigger from the message and return matching widgets
   if (process.env.MOCK_AI === 'true') {
     return Response.json({
-      widget_ids: ['travel.itinerary', 'travel.map'],
+      widget_ids: mockWidgetIds(detectTrigger(parsed.message)),
     });
   }
 
