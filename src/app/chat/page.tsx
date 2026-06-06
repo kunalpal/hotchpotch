@@ -242,199 +242,197 @@ export default function ChatPage() {
   }, []);
 
   return (
-    <SidebarProvider className="h-screen flex-col">
-      <Header compact moduleName="Chat" />
-      <div className="flex min-h-0 flex-1">
-        <ChatSidebar />
-        <SidebarInset className="min-h-0">
-          <div className="flex h-full">
-            {/* Left pane — chat */}
-            <div className="border-border flex w-1/2 flex-none flex-col border-r">
-              <ul className="m-0 flex flex-1 list-none flex-col gap-3 overflow-y-auto p-4">
-                {messages.map((message: UIMessage) => (
-                  <li
-                    key={message.id}
-                    className={cn(
-                      'max-w-[80%] rounded-lg px-3 py-2 text-sm break-words whitespace-pre-wrap',
-                      message.role === 'user'
-                        ? 'bg-primary text-primary-foreground self-end'
-                        : 'bg-muted text-foreground self-start'
-                    )}
-                  >
-                    {message.parts
-                      .filter((p) => p.type === 'text')
-                      .map((p, i) => (
-                        <span key={i}>{p.text}</span>
-                      ))}
-                  </li>
-                ))}
-                {isLoading && (
-                  <li className="text-muted-foreground self-start text-xs">
-                    thinking…
-                  </li>
-                )}
-              </ul>
+    <SidebarProvider className="h-screen">
+      <ChatSidebar />
+      <SidebarInset className="overflow-hidden">
+        <Header compact moduleName="Chat" />
+        <div className="flex min-h-0 flex-1">
+          {/* Left pane — chat */}
+          <div className="border-border flex w-1/2 flex-none flex-col border-r">
+            <ul className="m-0 flex flex-1 list-none flex-col gap-3 overflow-y-auto p-4">
+              {messages.map((message: UIMessage) => (
+                <li
+                  key={message.id}
+                  className={cn(
+                    'max-w-[80%] rounded-lg px-3 py-2 text-sm break-words whitespace-pre-wrap',
+                    message.role === 'user'
+                      ? 'bg-primary text-primary-foreground self-end'
+                      : 'bg-muted text-foreground self-start'
+                  )}
+                >
+                  {message.parts
+                    .filter((p) => p.type === 'text')
+                    .map((p, i) => (
+                      <span key={i}>{p.text}</span>
+                    ))}
+                </li>
+              ))}
+              {isLoading && (
+                <li className="text-muted-foreground self-start text-xs">
+                  thinking…
+                </li>
+              )}
+            </ul>
 
-              <form
-                onSubmit={handleSubmit}
-                className="border-border flex gap-2 border-t p-3"
-              >
-                <Textarea
-                  value={input}
-                  onChange={handleInputChange}
-                  placeholder="Ask anything…"
-                  rows={2}
-                  className="flex-1 resize-none"
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' && !e.shiftKey) {
-                      e.preventDefault();
-                      e.currentTarget.form?.requestSubmit();
-                    }
-                  }}
-                />
-                <Button type="submit" disabled={isLoading || !input.trim()}>
-                  Send
-                </Button>
-              </form>
-            </div>
-
-            {/* Right pane — widgets */}
-            <Tabs
-              value={effectiveActivePanelId ?? ''}
-              onValueChange={setActivePanelId}
-              className="flex min-w-0 flex-1 flex-col"
+            <form
+              onSubmit={handleSubmit}
+              className="border-border flex gap-2 border-t p-3"
             >
-              {/* Tab bar using shadcn TabsList + TabsTrigger */}
-              <TabsList className="border-border bg-muted/30 h-auto w-full justify-start gap-1 rounded-none border-b px-2 py-1">
-                {panels.map((panel) => (
-                  <div key={panel.panelId} className="flex items-center">
-                    <TabsTrigger
-                      value={panel.panelId}
-                      className={cn(
-                        'h-7 gap-1 px-2 text-xs data-[state=active]:shadow-none',
-                        panel.pulsing && 'text-emerald-500'
-                      )}
-                    >
-                      {panel.busy && (
-                        <span className="size-1.5 shrink-0 rounded-full bg-yellow-400" />
-                      )}
-                      {panel.failed && (
-                        <span className="text-destructive">⚠</span>
-                      )}
-                      {panel.displayName}
-                    </TabsTrigger>
-                    <button
-                      onClick={() => closePanel(panel.panelId)}
-                      title="Close panel"
-                      className="text-muted-foreground hover:text-foreground px-1 text-sm leading-none"
-                    >
-                      ×
-                    </button>
-                  </div>
-                ))}
+              <Textarea
+                value={input}
+                onChange={handleInputChange}
+                placeholder="Ask anything…"
+                rows={2}
+                className="flex-1 resize-none"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    e.currentTarget.form?.requestSubmit();
+                  }
+                }}
+              />
+              <Button type="submit" disabled={isLoading || !input.trim()}>
+                Send
+              </Button>
+            </form>
+          </div>
 
-                {panelsWithContent >= 2 && (
-                  <Button
-                    variant="outline"
-                    size="xs"
-                    onClick={() => setSplitMode((m) => !m)}
+          {/* Right pane — widgets */}
+          <Tabs
+            value={effectiveActivePanelId ?? ''}
+            onValueChange={setActivePanelId}
+            className="flex min-w-0 flex-1 flex-col"
+          >
+            {/* Tab bar using shadcn TabsList + TabsTrigger */}
+            <TabsList className="border-border bg-muted/30 h-auto w-full justify-start gap-1 rounded-none border-b px-2 py-1">
+              {panels.map((panel) => (
+                <div key={panel.panelId} className="flex items-center">
+                  <TabsTrigger
+                    value={panel.panelId}
                     className={cn(
-                      'ml-auto',
-                      effectiveSplitMode && 'bg-primary/10'
+                      'h-7 gap-1 px-2 text-xs data-[state=active]:shadow-none',
+                      panel.pulsing && 'text-emerald-500'
                     )}
                   >
-                    {effectiveSplitMode ? '⊟ Single' : '⊞ Split'}
-                  </Button>
-                )}
-              </TabsList>
+                    {panel.busy && (
+                      <span className="size-1.5 shrink-0 rounded-full bg-yellow-400" />
+                    )}
+                    {panel.failed && (
+                      <span className="text-destructive">⚠</span>
+                    )}
+                    {panel.displayName}
+                  </TabsTrigger>
+                  <button
+                    onClick={() => closePanel(panel.panelId)}
+                    title="Close panel"
+                    className="text-muted-foreground hover:text-foreground px-1 text-sm leading-none"
+                  >
+                    ×
+                  </button>
+                </div>
+              ))}
 
-              {/* Panel area — content lifecycle managed manually so all panels
+              {panelsWithContent >= 2 && (
+                <Button
+                  variant="outline"
+                  size="xs"
+                  onClick={() => setSplitMode((m) => !m)}
+                  className={cn(
+                    'ml-auto',
+                    effectiveSplitMode && 'bg-primary/10'
+                  )}
+                >
+                  {effectiveSplitMode ? '⊟ Single' : '⊞ Split'}
+                </Button>
+              )}
+            </TabsList>
+
+            {/* Panel area — content lifecycle managed manually so all panels
                   stay in the DOM (iframes would lose state if unmounted).
                   TabsContent is intentionally omitted; Tabs only drives selection. */}
-              <div className="relative flex-1 overflow-hidden">
-                {panels.length === 0 && (
+            <div className="relative flex-1 overflow-hidden">
+              {panels.length === 0 && (
+                <div className="text-muted-foreground absolute inset-0 flex items-center justify-center text-sm">
+                  Widget panel
+                </div>
+              )}
+
+              {/* Loading / failed placeholder for the active panel */}
+              {(() => {
+                const active = panels.find(
+                  (p) => p.panelId === effectiveActivePanelId
+                );
+                if (!active || active.hasContent) return null;
+                return (
                   <div className="text-muted-foreground absolute inset-0 flex items-center justify-center text-sm">
-                    Widget panel
+                    {active.failed
+                      ? 'Widget failed to load'
+                      : 'Waiting for widget…'}
                   </div>
-                )}
+                );
+              })()}
 
-                {/* Loading / failed placeholder for the active panel */}
-                {(() => {
-                  const active = panels.find(
-                    (p) => p.panelId === effectiveActivePanelId
-                  );
-                  if (!active || active.hasContent) return null;
-                  return (
-                    <div className="text-muted-foreground absolute inset-0 flex items-center justify-center text-sm">
-                      {active.failed
-                        ? 'Widget failed to load'
-                        : 'Waiting for widget…'}
-                    </div>
-                  );
-                })()}
-
-                {/* All panels kept in DOM to preserve state; shown/hidden via display.
+              {/* All panels kept in DOM to preserve state; shown/hidden via display.
                     Iframe panels use a stable callback-ref pattern (React-recommended for
                     dynamic ref lists). Native panels render their component directly. */}
-                {/* eslint-disable react-hooks/refs */}
-                {panels.map((panel) => {
-                  const isActive = panel.panelId === effectiveActivePanelId;
-                  const isSecondary = panel.panelId === secondaryPanelId;
-                  const show = (isActive || isSecondary) && panel.hasContent;
+              {/* eslint-disable react-hooks/refs */}
+              {panels.map((panel) => {
+                const isActive = panel.panelId === effectiveActivePanelId;
+                const isSecondary = panel.panelId === secondaryPanelId;
+                const show = (isActive || isSecondary) && panel.hasContent;
 
-                  // Only the computed position values stay as inline styles
-                  const left = effectiveSplitMode && isSecondary ? '50%' : '0';
-                  const width =
-                    effectiveSplitMode && secondaryPanelId ? '50%' : '100%';
+                // Only the computed position values stay as inline styles
+                const left = effectiveSplitMode && isSecondary ? '50%' : '0';
+                const width =
+                  effectiveSplitMode && secondaryPanelId ? '50%' : '100%';
 
-                  if (panel.hostType === 'native' && panel.nativeHost) {
-                    const NativeComponent =
-                      NATIVE_WIDGET_COMPONENTS[panel.panelId] ??
-                      NATIVE_WIDGET_COMPONENTS[
-                        panel.nativeHost.manifest.widget_id
-                      ];
-                    if (!NativeComponent) return null;
-                    return (
-                      <div
-                        key={panel.panelId}
-                        className={cn(
-                          'absolute top-0 bottom-0 overflow-auto',
-                          !show && 'hidden',
-                          effectiveSplitMode &&
-                            isSecondary &&
-                            'border-border border-l'
-                        )}
-                        style={{ left, width }}
-                      >
-                        <NativeComponent host={panel.nativeHost} />
-                      </div>
-                    );
-                  }
-
+                if (panel.hostType === 'native' && panel.nativeHost) {
+                  const NativeComponent =
+                    NATIVE_WIDGET_COMPONENTS[panel.panelId] ??
+                    NATIVE_WIDGET_COMPONENTS[
+                      panel.nativeHost.manifest.widget_id
+                    ];
+                  if (!NativeComponent) return null;
                   return (
-                    <iframe
+                    <div
                       key={panel.panelId}
-                      ref={getIframeRefCallback(panel.panelId)}
-                      src={panel.src}
-                      title={panel.displayName}
-                      sandbox="allow-scripts allow-forms"
                       className={cn(
-                        'absolute top-0 bottom-0 border-none',
+                        'absolute top-0 bottom-0 overflow-auto',
                         !show && 'hidden',
                         effectiveSplitMode &&
                           isSecondary &&
                           'border-border border-l'
                       )}
                       style={{ left, width }}
-                    />
+                    >
+                      <NativeComponent host={panel.nativeHost} />
+                    </div>
                   );
-                })}
-                {/* eslint-enable react-hooks/refs */}
-              </div>
-            </Tabs>
-          </div>
-        </SidebarInset>
-      </div>
+                }
+
+                return (
+                  <iframe
+                    key={panel.panelId}
+                    ref={getIframeRefCallback(panel.panelId)}
+                    src={panel.src}
+                    title={panel.displayName}
+                    sandbox="allow-scripts allow-forms"
+                    className={cn(
+                      'absolute top-0 bottom-0 border-none',
+                      !show && 'hidden',
+                      effectiveSplitMode &&
+                        isSecondary &&
+                        'border-border border-l'
+                    )}
+                    style={{ left, width }}
+                  />
+                );
+              })}
+              {/* eslint-enable react-hooks/refs */}
+            </div>
+          </Tabs>
+        </div>
+      </SidebarInset>
     </SidebarProvider>
   );
 }
