@@ -1,0 +1,10 @@
+{
+  "widget_id": "travel.itinerary",
+  "name": "Travel Itinerary",
+  "entry": "/widgets/travel-itinerary/index.html",
+  "views": ["overview"],
+  "tools": [],
+  "skills": [],
+  "input_events": [],
+  "action_templates": {}
+}
