@@ -5,6 +5,14 @@ import { useWidgetHost } from '@/lib/hooks/use-widget-host';
 import type { NativeWidgetHost } from '@/lib/runtime/native-widget-host';
 import type { TravelItineraryPayload } from '@/lib/widget-protocol';
 import { fetchExchangeRate } from '@/lib/actions/fetch-exchange-rate';
+import { Input } from '@/components/ui/input';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 
 interface Props {
   host: NativeWidgetHost;
@@ -97,86 +105,57 @@ export function FinanceBudget({ host }: Props) {
 
   if (!payload) {
     return (
-      <div
-        style={{
-          padding: '32px',
-          textAlign: 'center',
-          color: '#aaa',
-          fontSize: '14px',
-        }}
-      >
+      <div className="text-muted-foreground p-8 text-center text-sm">
         Waiting for itinerary to generate budget…
       </div>
     );
   }
 
   return (
-    <div
-      style={{
-        padding: '16px',
-        fontFamily: 'system-ui, sans-serif',
-        fontSize: '14px',
-      }}
-    >
-      <div
-        style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          marginBottom: '12px',
-        }}
-      >
-        <span style={{ fontWeight: 600 }}>Trip Budget</span>
-        <select
+    <div className="p-4 text-sm">
+      <div className="mb-3 flex items-center justify-between">
+        <span className="font-semibold">Trip Budget</span>
+        <Select
           value={currency}
-          onChange={(e) => handleCurrencyChange(e.target.value)}
-          style={{
-            padding: '4px 8px',
-            borderRadius: '4px',
-            border: '1px solid #d0d0d0',
-            fontSize: '13px',
+          onValueChange={(v) => {
+            void handleCurrencyChange(v);
           }}
         >
-          {CURRENCIES.map((c) => (
-            <option key={c} value={c}>
-              {c}
-            </option>
-          ))}
-        </select>
+          <SelectTrigger className="h-8 w-24 text-sm">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {CURRENCIES.map((c) => (
+              <SelectItem key={c} value={c}>
+                {c}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
 
-      <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+      <table className="w-full border-collapse">
         <thead>
-          <tr style={{ borderBottom: '2px solid #e0e0e0' }}>
-            <th
-              style={{ textAlign: 'left', padding: '6px 8px', color: '#555' }}
-            >
+          <tr className="border-border border-b-2">
+            <th className="text-muted-foreground px-2 py-1.5 text-left text-xs font-medium">
               Item
             </th>
-            <th
-              style={{ textAlign: 'right', padding: '6px 8px', color: '#555' }}
-            >
+            <th className="text-muted-foreground px-2 py-1.5 text-right text-xs font-medium">
               Cost ({currency})
             </th>
           </tr>
         </thead>
         <tbody>
           {lineItems.map((item) => (
-            <tr key={item.label} style={{ borderBottom: '1px solid #f0f0f0' }}>
-              <td style={{ padding: '6px 8px' }}>{item.label}</td>
-              <td style={{ padding: '6px 8px', textAlign: 'right' }}>
-                <input
+            <tr key={item.label} className="border-border/50 border-b">
+              <td className="px-2 py-1.5">{item.label}</td>
+              <td className="px-2 py-1.5 text-right">
+                <Input
                   type="number"
                   defaultValue={(parseFloat(item.amount) * rate).toFixed(2)}
                   onBlur={(e) => handleAmountBlur(item.label, e.target.value)}
-                  style={{
-                    width: '80px',
-                    textAlign: 'right',
-                    border: '1px solid #e0e0e0',
-                    borderRadius: '4px',
-                    padding: '2px 6px',
-                    fontSize: '13px',
-                  }}
+                  className="h-7 w-20 text-right text-sm"
+                  size="xs"
                 />
               </td>
             </tr>
@@ -184,23 +163,10 @@ export function FinanceBudget({ host }: Props) {
         </tbody>
         <tfoot>
           <tr>
-            <td
-              style={{
-                padding: '8px',
-                fontWeight: 600,
-                borderTop: '2px solid #e0e0e0',
-              }}
-            >
+            <td className="border-border border-t-2 px-2 py-2 font-semibold">
               Total
             </td>
-            <td
-              style={{
-                padding: '8px',
-                textAlign: 'right',
-                fontWeight: 600,
-                borderTop: '2px solid #e0e0e0',
-              }}
-            >
+            <td className="border-border border-t-2 px-2 py-2 text-right font-semibold">
               {currency} {total.toFixed(2)}
             </td>
           </tr>

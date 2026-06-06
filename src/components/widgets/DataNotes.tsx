@@ -3,6 +3,10 @@
 import { useId, useLayoutEffect, useRef, useState } from 'react';
 import { useWidgetHost } from '@/lib/hooks/use-widget-host';
 import type { NativeWidgetHost } from '@/lib/runtime/native-widget-host';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { cn } from '@/utils/ui';
 
 interface Props {
   host: NativeWidgetHost;
@@ -90,6 +94,7 @@ export function DataNotes({ host }: Props) {
       });
     }
   });
+
   const formId = useId();
   const titleRef = useRef<HTMLInputElement>(null);
   const bodyRef = useRef<HTMLTextAreaElement>(null);
@@ -123,144 +128,71 @@ export function DataNotes({ host }: Props) {
   const sorted = [...notes].sort((a, b) => Number(b.pinned) - Number(a.pinned));
 
   return (
-    <div
-      style={{
-        padding: '16px',
-        fontFamily: 'system-ui, sans-serif',
-        fontSize: '14px',
-        display: 'flex',
-        flexDirection: 'column',
-        height: '100%',
-        gap: '12px',
-      }}
-    >
+    <div className="flex h-full flex-col gap-3 p-4 text-sm">
       {/* Add note form */}
-      <div
-        style={{
-          border: '1px solid #e0e0e0',
-          borderRadius: '6px',
-          padding: '12px',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '8px',
-          flexShrink: 0,
-        }}
-      >
-        <input
+      <div className="border-border flex shrink-0 flex-col gap-2 rounded-lg border p-3">
+        <Input
           id={`${formId}-title`}
           ref={titleRef}
           placeholder="Note title…"
-          style={{
-            border: '1px solid #d0d0d0',
-            borderRadius: '4px',
-            padding: '6px 8px',
-            fontSize: '14px',
-            width: '100%',
-          }}
           onKeyDown={(e) => {
             if (e.key === 'Enter') addNote();
           }}
         />
-        <textarea
+        <Textarea
           id={`${formId}-body`}
           ref={bodyRef}
           placeholder="Note body (optional)…"
           rows={2}
-          style={{
-            border: '1px solid #d0d0d0',
-            borderRadius: '4px',
-            padding: '6px 8px',
-            fontSize: '13px',
-            resize: 'none',
-            width: '100%',
-          }}
+          className="resize-none text-sm"
         />
-        <button
-          onClick={addNote}
-          style={{
-            alignSelf: 'flex-end',
-            padding: '4px 12px',
-            background: '#0070f3',
-            color: '#fff',
-            border: 'none',
-            borderRadius: '4px',
-            cursor: 'pointer',
-            fontSize: '13px',
-          }}
-        >
+        <Button size="sm" onClick={addNote} className="self-end">
           Add note
-        </button>
+        </Button>
       </div>
 
       {/* Note list */}
-      <div
-        style={{
-          flex: 1,
-          overflowY: 'auto',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '8px',
-        }}
-      >
+      <div className="flex flex-1 flex-col gap-2 overflow-y-auto">
         {sorted.length === 0 && (
-          <p style={{ color: '#aaa', textAlign: 'center', marginTop: '24px' }}>
+          <p className="text-muted-foreground mt-6 text-center">
             No notes yet.
           </p>
         )}
         {sorted.map((note) => (
           <div
             key={note.id}
-            style={{
-              border: `1px solid ${note.pinned ? '#0070f3' : '#e0e0e0'}`,
-              borderRadius: '6px',
-              padding: '10px 12px',
-              background: note.pinned ? '#f0f6ff' : '#fff',
-            }}
+            className={cn(
+              'rounded-lg border px-3 py-2.5',
+              note.pinned
+                ? 'border-primary bg-primary/5'
+                : 'border-border bg-card'
+            )}
           >
-            <div
-              style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'flex-start',
-                gap: '8px',
-              }}
-            >
-              <span style={{ fontWeight: 600 }}>{note.title}</span>
-              <div style={{ display: 'flex', gap: '6px', flexShrink: 0 }}>
-                <button
+            <div className="flex items-start justify-between gap-2">
+              <span className="font-semibold">{note.title}</span>
+              <div className="flex shrink-0 gap-1.5">
+                <Button
+                  variant="outline"
+                  size="xs"
+                  className={cn(note.pinned && 'text-primary border-primary')}
                   onClick={() => togglePin(note)}
                   title={note.pinned ? 'Unpin' : 'Pin'}
-                  style={{
-                    background: 'none',
-                    border: '1px solid #d0d0d0',
-                    borderRadius: '4px',
-                    padding: '2px 6px',
-                    cursor: 'pointer',
-                    fontSize: '12px',
-                    color: note.pinned ? '#0070f3' : '#888',
-                  }}
                 >
                   {note.pinned ? '📌' : '📍'}
-                </button>
-                <button
+                </Button>
+                <Button
+                  variant="outline"
+                  size="xs"
+                  className="text-destructive hover:text-destructive"
                   onClick={() => deleteNote(note)}
                   title="Delete note"
-                  style={{
-                    background: 'none',
-                    border: '1px solid #d0d0d0',
-                    borderRadius: '4px',
-                    padding: '2px 6px',
-                    cursor: 'pointer',
-                    fontSize: '12px',
-                    color: '#ea4335',
-                  }}
                 >
                   ×
-                </button>
+                </Button>
               </div>
             </div>
             {note.body && (
-              <p style={{ margin: '6px 0 0', color: '#555', fontSize: '13px' }}>
+              <p className="text-muted-foreground mt-1.5 text-[13px]">
                 {note.body}
               </p>
             )}

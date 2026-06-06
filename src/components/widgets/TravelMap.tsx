@@ -4,12 +4,13 @@ import { useState } from 'react';
 import { useWidgetHost } from '@/lib/hooks/use-widget-host';
 import type { NativeWidgetHost } from '@/lib/runtime/native-widget-host';
 import type { TravelItineraryPayload } from '@/lib/widget-protocol';
+import { Button } from '@/components/ui/button';
 
 interface Props {
   host: NativeWidgetHost;
 }
 
-// Pin emoji grid used as a placeholder in lieu of a real map tile provider
+// Pin emoji used as a placeholder in lieu of a real map tile provider
 const PIN = '📍';
 
 export function TravelMap({ host }: Props) {
@@ -20,14 +21,7 @@ export function TravelMap({ host }: Props) {
 
   if (!payload) {
     return (
-      <div
-        style={{
-          padding: '32px',
-          textAlign: 'center',
-          color: '#aaa',
-          fontSize: '14px',
-        }}
-      >
+      <div className="text-muted-foreground p-8 text-center text-sm">
         Waiting for itinerary…
       </div>
     );
@@ -38,63 +32,39 @@ export function TravelMap({ host }: Props) {
   );
 
   return (
-    <div
-      style={{
-        padding: '16px',
-        fontFamily: 'system-ui, sans-serif',
-        fontSize: '14px',
-      }}
-    >
+    <div className="p-4 text-sm">
       <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))',
-          gap: '12px',
-        }}
+        className="grid gap-3"
+        style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))' }}
       >
         {visibleDays.map((day, i) => (
           <div
             key={day.location}
-            style={{
-              border: '1px solid #e0e0e0',
-              borderRadius: '8px',
-              overflow: 'hidden',
-              cursor: 'pointer',
-            }}
+            className="border-border cursor-pointer overflow-hidden rounded-lg border transition-shadow hover:shadow-md"
             onClick={() =>
               sendAction('LOCATION_FOCUSED', { location: day.location })
             }
           >
-            {/* Placeholder tile */}
+            {/* Placeholder colour tile — hue derived from index */}
             <div
-              style={{
-                height: '80px',
-                background: `hsl(${(i * 47) % 360}, 40%, 90%)`,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontSize: '28px',
-              }}
+              className="flex h-20 items-center justify-center text-3xl"
+              style={{ background: `hsl(${(i * 47) % 360}, 40%, 90%)` }}
             >
               {PIN}
             </div>
-            <div style={{ padding: '8px' }}>
-              <div style={{ fontWeight: 600, marginBottom: '2px' }}>
-                Day {i + 1}
-              </div>
-              <div style={{ color: '#555', fontSize: '12px' }}>
+            <div className="p-2">
+              <div className="mb-0.5 text-sm font-semibold">Day {i + 1}</div>
+              <div className="text-muted-foreground text-xs">
                 {day.location}
               </div>
-              <div style={{ color: '#888', fontSize: '11px' }}>{day.date}</div>
+              <div className="text-muted-foreground/70 text-[11px]">
+                {day.date}
+              </div>
             </div>
-            <div
-              style={{
-                padding: '0 8px 8px',
-                display: 'flex',
-                justifyContent: 'flex-end',
-              }}
-            >
-              <button
+            <div className="flex justify-end px-2 pb-2">
+              <Button
+                variant="outline"
+                size="xs"
                 onClick={(e) => {
                   e.stopPropagation();
                   setRemovedLocations(
@@ -102,24 +72,15 @@ export function TravelMap({ host }: Props) {
                   );
                   sendAction('LEG_REMOVED', { location: day.location });
                 }}
-                style={{
-                  background: 'none',
-                  border: '1px solid #e0e0e0',
-                  borderRadius: '4px',
-                  padding: '2px 6px',
-                  fontSize: '11px',
-                  color: '#888',
-                  cursor: 'pointer',
-                }}
               >
                 Remove leg
-              </button>
+              </Button>
             </div>
           </div>
         ))}
       </div>
       {visibleDays.length === 0 && (
-        <p style={{ color: '#aaa', textAlign: 'center', marginTop: '32px' }}>
+        <p className="text-muted-foreground mt-8 text-center">
           No legs remaining.
         </p>
       )}

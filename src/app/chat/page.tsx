@@ -12,6 +12,9 @@ import { useConversationManager } from '@/lib/chat/use-conversation-manager';
 import { TravelMap } from '@/components/widgets/TravelMap';
 import { FinanceBudget } from '@/components/widgets/FinanceBudget';
 import { DataNotes } from '@/components/widgets/DataNotes';
+import { Button } from '@/components/ui/button';
+import { Textarea } from '@/components/ui/textarea';
+import { cn } from '@/utils/ui';
 
 const PANEL_ID = 'travel.itinerary';
 const MANIFEST_URL = '/widgets/travel-itinerary/manifest.json';
@@ -282,47 +285,19 @@ export default function ChatPage() {
   }, []);
 
   return (
-    <div
-      style={{
-        display: 'flex',
-        height: '100vh',
-        fontFamily: 'system-ui, sans-serif',
-      }}
-    >
+    <div className="flex h-screen">
       {/* Left pane — chat */}
-      <div
-        style={{
-          flex: '0 0 50%',
-          display: 'flex',
-          flexDirection: 'column',
-          borderRight: '1px solid #e0e0e0',
-        }}
-      >
-        <ul
-          style={{
-            flex: 1,
-            overflowY: 'auto',
-            listStyle: 'none',
-            margin: 0,
-            padding: '16px',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '12px',
-          }}
-        >
+      <div className="border-border flex w-1/2 flex-none flex-col border-r">
+        <ul className="m-0 flex flex-1 list-none flex-col gap-3 overflow-y-auto p-4">
           {messages.map((message: UIMessage) => (
             <li
               key={message.id}
-              style={{
-                alignSelf: message.role === 'user' ? 'flex-end' : 'flex-start',
-                maxWidth: '80%',
-                background: message.role === 'user' ? '#0070f3' : '#f0f0f0',
-                color: message.role === 'user' ? '#fff' : '#111',
-                borderRadius: '8px',
-                padding: '8px 12px',
-                whiteSpace: 'pre-wrap',
-                wordBreak: 'break-word',
-              }}
+              className={cn(
+                'max-w-[80%] rounded-lg px-3 py-2 text-sm break-words whitespace-pre-wrap',
+                message.role === 'user'
+                  ? 'bg-primary text-primary-foreground self-end'
+                  : 'bg-muted text-foreground self-start'
+              )}
             >
               {message.parts
                 .filter((p) => p.type === 'text')
@@ -332,13 +307,7 @@ export default function ChatPage() {
             </li>
           ))}
           {isLoading && (
-            <li
-              style={{
-                alignSelf: 'flex-start',
-                color: '#888',
-                fontSize: '13px',
-              }}
-            >
+            <li className="text-muted-foreground self-start text-xs">
               thinking…
             </li>
           )}
@@ -346,178 +315,84 @@ export default function ChatPage() {
 
         <form
           onSubmit={handleSubmit}
-          style={{
-            display: 'flex',
-            gap: '8px',
-            padding: '12px 16px',
-            borderTop: '1px solid #e0e0e0',
-          }}
+          className="border-border flex gap-2 border-t p-3"
         >
-          <textarea
+          <Textarea
             value={input}
             onChange={handleInputChange}
             placeholder="Ask anything…"
             rows={2}
+            className="flex-1 resize-none"
             onKeyDown={(e) => {
               if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault();
                 e.currentTarget.form?.requestSubmit();
               }
             }}
-            style={{
-              flex: 1,
-              resize: 'none',
-              padding: '8px',
-              borderRadius: '6px',
-              border: '1px solid #ccc',
-              fontSize: '14px',
-            }}
           />
-          <button
-            type="submit"
-            disabled={isLoading || !input.trim()}
-            style={{
-              padding: '0 16px',
-              borderRadius: '6px',
-              border: 'none',
-              background: '#0070f3',
-              color: '#fff',
-              cursor: 'pointer',
-              fontSize: '14px',
-            }}
-          >
+          <Button type="submit" disabled={isLoading || !input.trim()}>
             Send
-          </button>
+          </Button>
         </form>
       </div>
 
       {/* Right pane — widgets */}
-      <div
-        style={{
-          flex: 1,
-          display: 'flex',
-          flexDirection: 'column',
-          minWidth: 0,
-        }}
-      >
+      <div className="flex min-w-0 flex-1 flex-col">
         {/* Tab bar */}
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '4px',
-            padding: '0 8px',
-            borderBottom: '1px solid #e0e0e0',
-            height: '36px',
-            background: '#fafafa',
-            flexShrink: 0,
-          }}
-        >
+        <div className="border-border bg-muted/30 flex h-9 shrink-0 items-center gap-1 border-b px-2">
           {panels.map((panel) => (
             <div
               key={panel.panelId}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '4px',
-                padding: '0 6px 0 8px',
-                height: '26px',
-                border: '1px solid',
-                borderColor:
-                  effectiveActivePanelId === panel.panelId
-                    ? '#0070f3'
-                    : panel.pulsing
-                      ? '#34a853'
-                      : '#d0d0d0',
-                borderRadius: '4px',
-                background:
-                  effectiveActivePanelId === panel.panelId ? '#e8f0fe' : '#fff',
-                fontSize: '13px',
-              }}
+              className={cn(
+                'flex h-7 items-center gap-1 rounded border pr-1.5 pl-2 text-xs',
+                effectiveActivePanelId === panel.panelId
+                  ? 'border-primary bg-primary/10'
+                  : panel.pulsing
+                    ? 'border-emerald-500'
+                    : 'border-border bg-card'
+              )}
             >
               {panel.busy && (
-                <span
-                  style={{
-                    width: '6px',
-                    height: '6px',
-                    borderRadius: '50%',
-                    background: '#fbbc04',
-                    flexShrink: 0,
-                  }}
-                />
+                <span className="size-1.5 shrink-0 rounded-full bg-yellow-400" />
               )}
               {panel.failed && (
-                <span style={{ fontSize: '11px', color: '#ea4335' }}>⚠</span>
+                <span className="text-destructive text-[11px]">⚠</span>
               )}
               <button
                 onClick={() => setActivePanelId(panel.panelId)}
-                style={{
-                  background: 'none',
-                  border: 'none',
-                  padding: 0,
-                  cursor: 'pointer',
-                  fontSize: '13px',
-                  color: panel.failed ? '#ea4335' : '#111',
-                  whiteSpace: 'nowrap',
-                }}
+                className={cn(
+                  'cursor-pointer border-0 bg-transparent p-0 text-xs whitespace-nowrap',
+                  panel.failed ? 'text-destructive' : 'text-foreground'
+                )}
               >
                 {panel.displayName}
               </button>
               <button
                 onClick={() => closePanel(panel.panelId)}
                 title="Close panel"
-                style={{
-                  background: 'none',
-                  border: 'none',
-                  padding: '0 2px',
-                  cursor: 'pointer',
-                  fontSize: '14px',
-                  color: '#999',
-                  lineHeight: 1,
-                  flexShrink: 0,
-                }}
+                className="text-muted-foreground hover:text-foreground shrink-0 cursor-pointer border-0 bg-transparent px-0.5 text-sm leading-none"
               >
                 ×
               </button>
             </div>
           ))}
 
-          {/* Split mode toggle — only when ≥2 panels have content */}
           {panelsWithContent >= 2 && (
-            <button
+            <Button
+              variant="outline"
+              size="xs"
               onClick={() => setSplitMode((m) => !m)}
-              style={{
-                marginLeft: 'auto',
-                padding: '2px 8px',
-                border: '1px solid #d0d0d0',
-                borderRadius: '4px',
-                background: effectiveSplitMode ? '#e8f0fe' : '#fff',
-                cursor: 'pointer',
-                fontSize: '12px',
-                color: '#555',
-                whiteSpace: 'nowrap',
-              }}
+              className={cn('ml-auto', effectiveSplitMode && 'bg-primary/10')}
             >
               {effectiveSplitMode ? '⊟ Single' : '⊞ Split'}
-            </button>
+            </Button>
           )}
         </div>
 
         {/* Panel area */}
-        <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
-          {/* Empty state */}
+        <div className="relative flex-1 overflow-hidden">
           {panels.length === 0 && (
-            <div
-              style={{
-                position: 'absolute',
-                inset: 0,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: '#aaa',
-                fontSize: '14px',
-              }}
-            >
+            <div className="text-muted-foreground absolute inset-0 flex items-center justify-center text-sm">
               Widget panel
             </div>
           )}
@@ -529,17 +404,7 @@ export default function ChatPage() {
             );
             if (!active || active.hasContent) return null;
             return (
-              <div
-                style={{
-                  position: 'absolute',
-                  inset: 0,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  color: '#aaa',
-                  fontSize: '14px',
-                }}
-              >
+              <div className="text-muted-foreground absolute inset-0 flex items-center justify-center text-sm">
                 {active.failed
                   ? 'Widget failed to load'
                   : 'Waiting for widget…'}
@@ -556,30 +421,10 @@ export default function ChatPage() {
             const isSecondary = panel.panelId === secondaryPanelId;
             const show = (isActive || isSecondary) && panel.hasContent;
 
-            let left = '0';
-            let width = '100%';
-            let borderLeft = 'none';
-
-            if (effectiveSplitMode && secondaryPanelId) {
-              if (isActive) {
-                width = '50%';
-              } else if (isSecondary) {
-                left = '50%';
-                width = '50%';
-                borderLeft = '1px solid #e0e0e0';
-              }
-            }
-
-            const positionStyle = {
-              position: 'absolute' as const,
-              top: 0,
-              bottom: 0,
-              left,
-              width,
-              border: 'none',
-              borderLeft,
-              display: show ? 'block' : 'none',
-            };
+            // Only the computed position values stay as inline styles
+            const left = effectiveSplitMode && isSecondary ? '50%' : '0';
+            const width =
+              effectiveSplitMode && secondaryPanelId ? '50%' : '100%';
 
             if (panel.hostType === 'native' && panel.nativeHost) {
               const NativeComponent =
@@ -589,7 +434,14 @@ export default function ChatPage() {
               return (
                 <div
                   key={panel.panelId}
-                  style={{ ...positionStyle, overflow: 'auto' }}
+                  className={cn(
+                    'absolute top-0 bottom-0 overflow-auto',
+                    !show && 'hidden',
+                    effectiveSplitMode &&
+                      isSecondary &&
+                      'border-border border-l'
+                  )}
+                  style={{ left, width }}
                 >
                   <NativeComponent host={panel.nativeHost} />
                 </div>
@@ -603,7 +455,12 @@ export default function ChatPage() {
                 src={panel.src}
                 title={panel.displayName}
                 sandbox="allow-scripts allow-forms"
-                style={positionStyle}
+                className={cn(
+                  'absolute top-0 bottom-0 border-none',
+                  !show && 'hidden',
+                  effectiveSplitMode && isSecondary && 'border-border border-l'
+                )}
+                style={{ left, width }}
               />
             );
           })}
