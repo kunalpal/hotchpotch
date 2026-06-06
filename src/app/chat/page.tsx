@@ -1,7 +1,8 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { UIMessage } from 'ai';
+import type { WidgetManifest } from '@/lib/widget-manifest';
 import { RuntimeManager } from '@/lib/runtime/runtime-manager';
 import { ManifestLoader } from '@/lib/widget-manifest';
 import { useConversationManager } from '@/lib/chat/use-conversation-manager';
@@ -10,14 +11,38 @@ const PANEL_ID = 'travel.itinerary';
 const MANIFEST_URL = '/widgets/travel-itinerary/manifest.json';
 const WIDGET_SRC = '/widgets/travel-itinerary/index.html';
 
+interface PanelEntry {
+  panelId: string;
+  displayName: string;
+  /** undefined until mountWidget registers, then set to trigger iframe load */
+  src: string | undefined;
+  /** true once onRenderWidgetStarted fires — controls iframe visibility */
+  hasContent: boolean;
+  busy: boolean;
+  failed: boolean;
+}
+
 export default function ChatPage() {
-  // useRef — not useState — so mutation in effects doesn't trigger immutability rule
   const runtimeManagerRef = useRef(new RuntimeManager());
   const manifestLoaderRef = useRef(new ManifestLoader());
-  const iframeRef = useRef<HTMLIFrameElement>(null);
   const injectTurnRef = useRef<((content: string) => void) | null>(null);
-  const [iframeSrc, setIframeSrc] = useState<string | undefined>(undefined);
-  const [widgetVisible, setWidgetVisible] = useState(false);
+
+  // Iframe DOM elements keyed by panelId
+  const iframeRefs = useRef(new Map<string, HTMLIFrameElement>());
+  // Stable callback-ref functions per panelId — must not be recreated on each render
+  // so React doesn't call null/element unnecessarily. This is the React-recommended
+  // pattern for dynamic ref lists (https://react.dev/learn/manipulating-the-dom-with-refs).
+  const iframeRefCallbacks = useRef(
+    new Map<string, (el: HTMLIFrameElement | null) => void>()
+  );
+  // Pending mount data queued before the iframe element exists in the DOM
+  const pendingMountsRef = useRef(
+    new Map<string, { manifest: WidgetManifest; widgetSrc: string }>()
+  );
+
+  const [panels, setPanels] = useState<PanelEntry[]>([]);
+  const [activePanelId, setActivePanelId] = useState<string | null>(null);
+  const [splitMode, setSplitMode] = useState(false);
 
   const {
     messages,
@@ -28,48 +53,132 @@ export default function ChatPage() {
     injectTurn,
   } = useConversationManager(runtimeManagerRef);
 
-  // Keep injectTurnRef in sync so the RuntimeManager callback always has the latest closure
   useEffect(() => {
     injectTurnRef.current = injectTurn;
   }, [injectTurn]);
 
-  // Wire callbacks, start listener, and pre-mount the widget
+  // When the active panel is removed, fall back to the last remaining panel.
+  // Derived during render rather than via a setState-in-effect to avoid a
+  // cascading render cycle.
+  const effectiveActivePanelId =
+    panels.find((p) => p.panelId === activePanelId) !== undefined
+      ? activePanelId
+      : (panels[panels.length - 1]?.panelId ?? null);
+
+  // Split is only meaningful when ≥2 panels have content. Derive rather than
+  // resetting via an effect so the flag resets without an extra render.
+  const panelsWithContent = panels.filter((p) => p.hasContent).length;
+  const effectiveSplitMode = splitMode && panelsWithContent >= 2;
+
+  // In split mode, secondary is the first panel with content that isn't active
+  const secondaryPanelId = effectiveSplitMode
+    ? (panels.find((p) => p.panelId !== effectiveActivePanelId && p.hasContent)
+        ?.panelId ?? null)
+    : null;
+
+  // Returns a stable ref callback for a given panelId. Only creates a new
+  // function on the first call for each panelId, so React doesn't call the
+  // null/element cycle on re-renders. Follows the React docs pattern for
+  // managing a list of refs with a Map (ref callback inside ref.current).
+  const getIframeRefCallback = useCallback((panelId: string) => {
+    if (!iframeRefCallbacks.current.has(panelId)) {
+      iframeRefCallbacks.current.set(
+        panelId,
+        (el: HTMLIFrameElement | null) => {
+          if (el) {
+            iframeRefs.current.set(panelId, el);
+            const pending = pendingMountsRef.current.get(panelId);
+            if (pending) {
+              pendingMountsRef.current.delete(panelId);
+              // mountWidget registers BEFORE src is set, so READY arrives to an
+              // already-registered entry — no handshake race condition.
+              runtimeManagerRef.current.mountWidget(
+                panelId,
+                el,
+                pending.manifest,
+                null,
+                pending.widgetSrc
+              );
+              setPanels((prev) =>
+                prev.map((p) =>
+                  p.panelId === panelId ? { ...p, src: pending.widgetSrc } : p
+                )
+              );
+            }
+          } else {
+            iframeRefs.current.delete(panelId);
+            iframeRefCallbacks.current.delete(panelId);
+          }
+        }
+      );
+    }
+    return iframeRefCallbacks.current.get(panelId)!;
+  }, []);
+
+  const closePanel = useCallback((panelId: string) => {
+    runtimeManagerRef.current.unmountWidget(panelId);
+  }, []);
+
   useEffect(() => {
     const rm = runtimeManagerRef.current;
     let unmounted = false;
 
     rm.onInjectTurn = (content) => injectTurnRef.current?.(content);
-    rm.onRenderWidgetStarted = () => setWidgetVisible(true);
-    rm.onWidgetFailed = () =>
-      console.warn('[ChatPage] Widget failed to handshake within 3 s');
+
+    rm.onWidgetFailed = (panelId) => {
+      setPanels((prev) =>
+        prev.map((p) => (p.panelId === panelId ? { ...p, failed: true } : p))
+      );
+    };
+
+    rm.onRenderWidgetStarted = (panelId) => {
+      setPanels((prev) =>
+        prev.map((p) =>
+          p.panelId === panelId ? { ...p, hasContent: true } : p
+        )
+      );
+      setActivePanelId(panelId);
+    };
+
+    rm.onPanelUnmounted = (panelId) => {
+      setPanels((prev) => prev.filter((p) => p.panelId !== panelId));
+    };
 
     rm.start();
 
     manifestLoaderRef.current
       .load(MANIFEST_URL)
       .then((manifest) => {
-        if (!unmounted && iframeRef.current) {
-          rm.mountWidget(
-            PANEL_ID,
-            iframeRef.current,
-            manifest,
-            null,
-            WIDGET_SRC
-          );
-          setIframeSrc(WIDGET_SRC);
-        }
+        if (unmounted) return;
+        // Queue mount before adding the panel to state. The iframe callback ref
+        // fires after the element appears in the DOM and drains this queue.
+        pendingMountsRef.current.set(PANEL_ID, {
+          manifest,
+          widgetSrc: WIDGET_SRC,
+        });
+        setPanels((prev) => [
+          ...prev,
+          {
+            panelId: PANEL_ID,
+            displayName: manifest.name,
+            src: undefined,
+            hasContent: false,
+            busy: false,
+            failed: false,
+          },
+        ]);
+        setActivePanelId(PANEL_ID);
       })
       .catch((err: unknown) => {
-        if (!unmounted) {
+        if (!unmounted)
           console.error('[ChatPage] Failed to load widget manifest:', err);
-        }
       });
 
     return () => {
       unmounted = true;
       rm.stop();
     };
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <div
@@ -181,34 +290,207 @@ export default function ChatPage() {
         </form>
       </div>
 
-      {/* Right pane — widget */}
-      <div style={{ flex: 1, position: 'relative' }}>
-        <iframe
-          ref={iframeRef}
-          src={iframeSrc}
-          title="Widget panel"
+      {/* Right pane — widgets */}
+      <div
+        style={{
+          flex: 1,
+          display: 'flex',
+          flexDirection: 'column',
+          minWidth: 0,
+        }}
+      >
+        {/* Tab bar */}
+        <div
           style={{
-            width: '100%',
-            height: '100%',
-            border: 'none',
-            display: widgetVisible ? 'block' : 'none',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '4px',
+            padding: '0 8px',
+            borderBottom: '1px solid #e0e0e0',
+            height: '36px',
+            background: '#fafafa',
+            flexShrink: 0,
           }}
-        />
-        {!widgetVisible && (
-          <div
-            style={{
-              position: 'absolute',
-              inset: 0,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: '#aaa',
-              fontSize: '14px',
-            }}
-          >
-            Widget panel
-          </div>
-        )}
+        >
+          {panels.map((panel) => (
+            <div
+              key={panel.panelId}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px',
+                padding: '0 6px 0 8px',
+                height: '26px',
+                border: '1px solid',
+                borderColor:
+                  effectiveActivePanelId === panel.panelId
+                    ? '#0070f3'
+                    : '#d0d0d0',
+                borderRadius: '4px',
+                background:
+                  effectiveActivePanelId === panel.panelId ? '#e8f0fe' : '#fff',
+                fontSize: '13px',
+              }}
+            >
+              {panel.busy && (
+                <span
+                  style={{
+                    width: '6px',
+                    height: '6px',
+                    borderRadius: '50%',
+                    background: '#fbbc04',
+                    flexShrink: 0,
+                  }}
+                />
+              )}
+              {panel.failed && (
+                <span style={{ fontSize: '11px', color: '#ea4335' }}>⚠</span>
+              )}
+              <button
+                onClick={() => setActivePanelId(panel.panelId)}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  padding: 0,
+                  cursor: 'pointer',
+                  fontSize: '13px',
+                  color: panel.failed ? '#ea4335' : '#111',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                {panel.displayName}
+              </button>
+              <button
+                onClick={() => closePanel(panel.panelId)}
+                title="Close panel"
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  padding: '0 2px',
+                  cursor: 'pointer',
+                  fontSize: '14px',
+                  color: '#999',
+                  lineHeight: 1,
+                  flexShrink: 0,
+                }}
+              >
+                ×
+              </button>
+            </div>
+          ))}
+
+          {/* Split mode toggle — only when ≥2 panels have content */}
+          {panelsWithContent >= 2 && (
+            <button
+              onClick={() => setSplitMode((m) => !m)}
+              style={{
+                marginLeft: 'auto',
+                padding: '2px 8px',
+                border: '1px solid #d0d0d0',
+                borderRadius: '4px',
+                background: effectiveSplitMode ? '#e8f0fe' : '#fff',
+                cursor: 'pointer',
+                fontSize: '12px',
+                color: '#555',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              {effectiveSplitMode ? '⊟ Single' : '⊞ Split'}
+            </button>
+          )}
+        </div>
+
+        {/* Panel area */}
+        <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
+          {/* Empty state */}
+          {panels.length === 0 && (
+            <div
+              style={{
+                position: 'absolute',
+                inset: 0,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: '#aaa',
+                fontSize: '14px',
+              }}
+            >
+              Widget panel
+            </div>
+          )}
+
+          {/* Loading / failed placeholder for the active panel before it has content */}
+          {(() => {
+            const active = panels.find(
+              (p) => p.panelId === effectiveActivePanelId
+            );
+            if (!active || active.hasContent) return null;
+            return (
+              <div
+                style={{
+                  position: 'absolute',
+                  inset: 0,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: '#aaa',
+                  fontSize: '14px',
+                }}
+              >
+                {active.failed
+                  ? 'Widget failed to load'
+                  : 'Waiting for widget…'}
+              </div>
+            );
+          })()}
+
+          {/* All iframes kept in DOM to preserve state; shown/hidden via display.
+              getIframeRefCallback accesses iframeRefCallbacks.current (a ref) to
+              return a stable callback per panelId — the React-recommended pattern
+              for dynamic ref lists. The Map is read here during render only to
+              retrieve the stable function reference, not to read render-affecting state. */}
+          {/* eslint-disable react-hooks/refs */}
+          {panels.map((panel) => {
+            const isActive = panel.panelId === effectiveActivePanelId;
+            const isSecondary = panel.panelId === secondaryPanelId;
+            const show = (isActive || isSecondary) && panel.hasContent;
+
+            let left = '0';
+            let width = '100%';
+            let borderLeft = 'none';
+
+            if (effectiveSplitMode && secondaryPanelId) {
+              if (isActive) {
+                width = '50%';
+              } else if (isSecondary) {
+                left = '50%';
+                width = '50%';
+                borderLeft = '1px solid #e0e0e0';
+              }
+            }
+
+            return (
+              <iframe
+                key={panel.panelId}
+                ref={getIframeRefCallback(panel.panelId)}
+                src={panel.src}
+                title={panel.displayName}
+                sandbox="allow-scripts allow-forms"
+                style={{
+                  position: 'absolute',
+                  top: 0,
+                  bottom: 0,
+                  left,
+                  width,
+                  border: 'none',
+                  borderLeft,
+                  display: show ? 'block' : 'none',
+                }}
+              />
+            );
+          })}
+          {/* eslint-enable react-hooks/refs */}
+        </div>
       </div>
     </div>
   );

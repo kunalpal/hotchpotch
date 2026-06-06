@@ -18,6 +18,7 @@ export class RuntimeManager {
 
   onWidgetReady: ((panelId: string) => void) | null = null;
   onWidgetFailed: ((panelId: string) => void) | null = null;
+  onPanelUnmounted: ((panelId: string) => void) | null = null;
   onInjectTurn: ((content: string) => void) | null = null;
   onRenderWidgetStarted: ((panelId: string) => void) | null = null;
 
@@ -95,6 +96,22 @@ export class RuntimeManager {
       const type = updateStrategy === 'replace' ? 'REPLACE' : 'MOUNT';
       record.pendingOutbound.push(createEnvelope(type, { payload }));
     }
+  }
+
+  unmountWidget(panelId: string): void {
+    const record = this.registry.get(panelId);
+    if (!record) return;
+    // Clear any pending ready timeout so it can't fire after removal
+    if (record.readyTimeout) clearTimeout(record.readyTimeout);
+    if (record.status === 'ready') {
+      this.sendToWidget(
+        panelId,
+        createEnvelope('UNMOUNT', { reason: 'user_closed' })
+      );
+    }
+    this.registry.remove(panelId);
+    this.passiveBuffers.delete(panelId);
+    this.onPanelUnmounted?.(panelId);
   }
 
   flushPassiveBuffer(panelId: string): string[] {
