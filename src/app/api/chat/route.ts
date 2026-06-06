@@ -26,8 +26,8 @@ Always include specific dates, locations, and concrete activities — never use 
           'Render an interactive widget in the side panel to display structured data alongside the chat.',
         inputSchema: z.object({
           widget_id: z
-            .string()
-            .describe('Widget type to render, e.g. "travel.itinerary"'),
+            .enum(['travel.itinerary'])
+            .describe('Widget type to render'),
           update_strategy: z
             .enum(['mount', 'replace'])
             .default('mount')
