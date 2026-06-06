@@ -19,6 +19,8 @@ interface PanelEntry {
   /** true once onRenderWidgetStarted fires — controls iframe visibility */
   hasContent: boolean;
   busy: boolean;
+  /** briefly true when a background tool completes — drives the tab pulse animation */
+  pulsing: boolean;
   failed: boolean;
 }
 
@@ -144,6 +146,19 @@ export default function ChatPage() {
       setPanels((prev) => prev.filter((p) => p.panelId !== panelId));
     };
 
+    rm.onBackgroundToolComplete = (panelId) => {
+      setPanels((prev) =>
+        prev.map((p) => (p.panelId === panelId ? { ...p, pulsing: true } : p))
+      );
+      setTimeout(() => {
+        setPanels((prev) =>
+          prev.map((p) =>
+            p.panelId === panelId ? { ...p, pulsing: false } : p
+          )
+        );
+      }, 1000);
+    };
+
     rm.start();
 
     manifestLoaderRef.current
@@ -164,6 +179,7 @@ export default function ChatPage() {
             src: undefined,
             hasContent: false,
             busy: false,
+            pulsing: false,
             failed: false,
           },
         ]);
@@ -325,7 +341,9 @@ export default function ChatPage() {
                 borderColor:
                   effectiveActivePanelId === panel.panelId
                     ? '#0070f3'
-                    : '#d0d0d0',
+                    : panel.pulsing
+                      ? '#34a853'
+                      : '#d0d0d0',
                 borderRadius: '4px',
                 background:
                   effectiveActivePanelId === panel.panelId ? '#e8f0fe' : '#fff',

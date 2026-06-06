@@ -19,6 +19,7 @@ export class RuntimeManager {
   onWidgetReady: ((panelId: string) => void) | null = null;
   onWidgetFailed: ((panelId: string) => void) | null = null;
   onPanelUnmounted: ((panelId: string) => void) | null = null;
+  onBackgroundToolComplete: ((panelId: string) => void) | null = null;
   onInjectTurn: ((content: string) => void) | null = null;
   onRenderWidgetStarted: ((panelId: string) => void) | null = null;
 
