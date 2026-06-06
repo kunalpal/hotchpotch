@@ -70,9 +70,9 @@ export class RuntimeManager {
     payload: unknown,
     updateStrategy: 'mount' | 'replace'
   ): void {
-    this.onRenderWidgetStarted?.(panelId);
     const record = this.registry.get(panelId);
     if (!record) return;
+    this.onRenderWidgetStarted?.(panelId);
 
     // Validate payload against the widget's registered schema
     const schema = WIDGET_PAYLOAD_SCHEMAS[record.manifest.widget_id];
