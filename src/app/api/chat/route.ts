@@ -125,7 +125,12 @@ Always include specific dates, locations, and concrete activities — never use 
           'Render an interactive widget in the side panel to display structured data alongside the chat.',
         inputSchema: z.object({
           widget_id: z
-            .enum(['travel.itinerary'])
+            .enum([
+              'travel.itinerary',
+              'travel.map',
+              'finance.budget',
+              'data.notes',
+            ])
             .describe('Widget type to render'),
           update_strategy: z
             .enum(['mount', 'replace'])
@@ -142,6 +147,17 @@ Always include specific dates, locations, and concrete activities — never use 
           // and routes the payload to the widget iframe directly.
           return { ok: true, widget_id, update_strategy };
         },
+      }),
+      // Widget-registered tool: finance.budget → fetch_exchange_rate
+      // The execute here is a server-side stub; real execution happens in the
+      // widget via TOOL_INVOKE/TOOL_RESULT (client intercepts in onToolCall).
+      'finance.budget__fetch_exchange_rate': tool({
+        description: 'Fetch the current exchange rate between two currencies.',
+        inputSchema: z.object({
+          from: z.string().describe('Source currency code (e.g. USD)'),
+          to: z.string().describe('Target currency code (e.g. EUR)'),
+        }),
+        execute: async () => ({ rate: 1.0 }),
       }),
     },
   });

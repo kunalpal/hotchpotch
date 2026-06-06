@@ -74,6 +74,14 @@ export class RuntimeManager {
     this.hosts.set(panelId, host);
     this.passiveBuffers.set(panelId, new PendingContextBuffer());
 
+    // Native widgets are trusted — register manifest tools immediately without
+    // a REGISTER_TOOLS handshake (the manifest IS the authority for native widgets)
+    if (manifest.tools.length > 0) {
+      const namespaced = manifest.tools.map((t) => `${panelId}__${t.name}`);
+      host.registeredTools = namespaced;
+      this.onToolRegistryUpdate?.(namespaced, []);
+    }
+
     return host;
   }
 

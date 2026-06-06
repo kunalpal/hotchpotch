@@ -1,10 +1,17 @@
 'use client';
 
-import { type MutableRefObject, useCallback, useRef, useState } from 'react';
+import {
+  type MutableRefObject,
+  useCallback,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from 'react';
 import { useChat } from '@ai-sdk/react';
 import { generateId } from 'ai';
 import type { UIMessage } from 'ai';
 import type { RuntimeManager } from '@/lib/runtime/runtime-manager';
+import { ToolDispatcher } from '@/lib/runtime/tool-dispatcher';
 
 const INJECTED_PREFIX = '__injected__';
 
@@ -15,22 +22,70 @@ export function useConversationManager(
 ) {
   const [input, setInput] = useState('');
   const activePanelId = useRef<string | null>(null);
+  // Stable ref for addToolResult so the onToolCall closure can call it without
+  // capturing a stale value. Typed as `any` to avoid the SDK's complex generic.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const addToolResultRef = useRef<((params: any) => void) | null>(null);
 
-  const { messages, sendMessage, status } = useChat({
+  const { messages, sendMessage, status, addToolResult } = useChat({
     onToolCall({ toolCall }) {
-      if (toolCall.toolName !== 'render_widget') return;
-      const { widget_id, update_strategy, payload } = toolCall.input as {
-        widget_id: string;
-        update_strategy?: 'mount' | 'replace';
-        payload: unknown;
-      };
-      activePanelId.current = widget_id;
-      runtimeManagerRef.current.onRenderWidget(
-        widget_id,
-        payload,
-        update_strategy ?? 'mount'
+      if (toolCall.toolName === 'render_widget') {
+        const { widget_id, update_strategy, payload } = toolCall.input as {
+          widget_id: string;
+          update_strategy?: 'mount' | 'replace';
+          payload: unknown;
+        };
+        activePanelId.current = widget_id;
+        runtimeManagerRef.current.onRenderWidget(
+          widget_id,
+          payload,
+          update_strategy ?? 'mount'
+        );
+        return;
+      }
+
+      // Widget-registered tool call — dispatch and resolve via addToolResult
+      const parsed = ToolDispatcher.parseNamespace(toolCall.toolName);
+      if (!parsed) return;
+
+      const rm = runtimeManagerRef.current;
+      const host = rm.getHost(parsed.panelId);
+      if (!host) return;
+
+      const toolDef = host.manifest.tools.find(
+        (t) => t.name === parsed.toolName
       );
+      const timeoutMs = toolDef?.timeout_ms ?? 30000;
+      const toolName = toolCall.toolName;
+      const toolCallId = toolCall.toolCallId;
+
+      rm.toolDispatcher
+        .dispatch(
+          toolCallId,
+          parsed.panelId,
+          parsed.toolName,
+          toolCall.input,
+          timeoutMs,
+          host
+        )
+        .then((output) => {
+          addToolResultRef.current?.({ tool: toolName, toolCallId, output });
+        })
+        .catch((err: unknown) => {
+          addToolResultRef.current?.({
+            tool: toolName,
+            toolCallId,
+            state: 'output-error',
+            errorText: String(err),
+          });
+        });
     },
+  });
+
+  // Sync addToolResult into a ref after each render so the onToolCall closure
+  // always has the latest version without reading it during render.
+  useLayoutEffect(() => {
+    addToolResultRef.current = addToolResult;
   });
 
   // Filter out render_widget tool parts and injected synthetic turns from display
@@ -38,9 +93,16 @@ export function useConversationManager(
     .filter((m) => !m.id.startsWith(INJECTED_PREFIX))
     .map((m) => ({
       ...m,
-      parts: m.parts.filter(
-        (p) => p.type !== 'tool-render_widget' && p.type !== 'step-start'
-      ),
+      parts: m.parts.filter((p) => {
+        if (p.type === 'step-start') return false;
+        // Hide render_widget and all widget tool calls (panelId__toolName)
+        if (p.type.startsWith('tool-')) {
+          const toolName = p.type.slice('tool-'.length);
+          if (toolName === 'render_widget' || toolName.includes('__'))
+            return false;
+        }
+        return true;
+      }),
     }))
     .filter((m) => m.parts.length > 0);
 
