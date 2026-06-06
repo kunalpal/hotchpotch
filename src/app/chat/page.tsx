@@ -5,7 +5,6 @@ import type { ComponentType } from 'react';
 import type { UIMessage } from 'ai';
 import type { WidgetManifest } from '@/lib/widget-manifest';
 import { RuntimeManager } from '@/lib/runtime/runtime-manager';
-import { ManifestLoader } from '@/lib/widget-manifest';
 import type { NativeWidgetHost } from '@/lib/runtime/native-widget-host';
 import { NATIVE_MANIFESTS } from '@/lib/widget-manifest-registry';
 import { useConversationManager } from '@/lib/chat/use-conversation-manager';
@@ -14,19 +13,12 @@ import { FinanceBudget } from '@/components/widgets/FinanceBudget';
 import { DataNotes } from '@/components/widgets/DataNotes';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar';
 import Header from '@/components/layout/header';
 import { ChatSidebar } from '@/components/layout/chat-sidebar';
 import { cn } from '@/utils/ui';
 
-const PANEL_ID = 'travel.itinerary';
-const MANIFEST_URL = '/widgets/travel-itinerary/manifest.json';
-const WIDGET_SRC = '/widgets/travel-itinerary/index.html';
-
-/**
- * Registry of native widget React components, keyed by widget_id.
- * Populated incrementally as each native widget is implemented (Tasks 22–24).
- */
 const NATIVE_WIDGET_COMPONENTS: Record<
   string,
   ComponentType<{ host: NativeWidgetHost }>
@@ -54,7 +46,6 @@ interface PanelEntry {
 
 export default function ChatPage() {
   const runtimeManagerRef = useRef(new RuntimeManager());
-  const manifestLoaderRef = useRef(new ManifestLoader());
   const injectTurnRef = useRef<((content: string) => void) | null>(null);
 
   // Iframe DOM elements keyed by panelId
@@ -211,7 +202,6 @@ export default function ChatPage() {
 
   useEffect(() => {
     const rm = runtimeManagerRef.current;
-    let unmounted = false;
 
     rm.onInjectTurn = (content) => injectTurnRef.current?.(content);
 
@@ -248,43 +238,7 @@ export default function ChatPage() {
     };
 
     rm.start();
-
-    manifestLoaderRef.current
-      .load(MANIFEST_URL)
-      .then((manifest) => {
-        if (unmounted) return;
-        // Queue mount before adding the panel to state. The iframe callback ref
-        // fires after the element appears in the DOM and drains this queue.
-        mountedWidgetIdsRef.current.add(PANEL_ID);
-        pendingMountsRef.current.set(PANEL_ID, {
-          manifest,
-          widgetSrc: WIDGET_SRC,
-        });
-        setPanels((prev) => [
-          ...prev,
-          {
-            panelId: PANEL_ID,
-            displayName: manifest.name,
-            hostType: 'iframe',
-            src: undefined,
-            nativeHost: undefined,
-            hasContent: false,
-            busy: false,
-            pulsing: false,
-            failed: false,
-          },
-        ]);
-        setActivePanelId(PANEL_ID);
-      })
-      .catch((err: unknown) => {
-        if (!unmounted)
-          console.error('[ChatPage] Failed to load widget manifest:', err);
-      });
-
-    return () => {
-      unmounted = true;
-      rm.stop();
-    };
+    return () => rm.stop();
   }, []);
 
   return (
@@ -345,40 +299,34 @@ export default function ChatPage() {
             </div>
 
             {/* Right pane — widgets */}
-            <div className="flex min-w-0 flex-1 flex-col">
-              {/* Tab bar */}
-              <div className="border-border bg-muted/30 flex h-9 shrink-0 items-center gap-1 border-b px-2">
+            <Tabs
+              value={effectiveActivePanelId ?? ''}
+              onValueChange={setActivePanelId}
+              className="flex min-w-0 flex-1 flex-col"
+            >
+              {/* Tab bar using shadcn TabsList + TabsTrigger */}
+              <TabsList className="border-border bg-muted/30 h-auto w-full justify-start gap-1 rounded-none border-b px-2 py-1">
                 {panels.map((panel) => (
-                  <div
-                    key={panel.panelId}
-                    className={cn(
-                      'flex h-7 items-center gap-1 rounded border pr-1.5 pl-2 text-xs',
-                      effectiveActivePanelId === panel.panelId
-                        ? 'border-primary bg-primary/10'
-                        : panel.pulsing
-                          ? 'border-emerald-500'
-                          : 'border-border bg-card'
-                    )}
-                  >
-                    {panel.busy && (
-                      <span className="size-1.5 shrink-0 rounded-full bg-yellow-400" />
-                    )}
-                    {panel.failed && (
-                      <span className="text-destructive text-xs">⚠</span>
-                    )}
-                    <button
-                      onClick={() => setActivePanelId(panel.panelId)}
+                  <div key={panel.panelId} className="flex items-center">
+                    <TabsTrigger
+                      value={panel.panelId}
                       className={cn(
-                        'cursor-pointer border-0 bg-transparent p-0 text-xs whitespace-nowrap',
-                        panel.failed ? 'text-destructive' : 'text-foreground'
+                        'h-7 gap-1 px-2 text-xs data-[state=active]:shadow-none',
+                        panel.pulsing && 'text-emerald-500'
                       )}
                     >
+                      {panel.busy && (
+                        <span className="size-1.5 shrink-0 rounded-full bg-yellow-400" />
+                      )}
+                      {panel.failed && (
+                        <span className="text-destructive">⚠</span>
+                      )}
                       {panel.displayName}
-                    </button>
+                    </TabsTrigger>
                     <button
                       onClick={() => closePanel(panel.panelId)}
                       title="Close panel"
-                      className="text-muted-foreground hover:text-foreground shrink-0 cursor-pointer border-0 bg-transparent px-0.5 text-sm leading-none"
+                      className="text-muted-foreground hover:text-foreground px-1 text-sm leading-none"
                     >
                       ×
                     </button>
@@ -398,9 +346,11 @@ export default function ChatPage() {
                     {effectiveSplitMode ? '⊟ Single' : '⊞ Split'}
                   </Button>
                 )}
-              </div>
+              </TabsList>
 
-              {/* Panel area */}
+              {/* Panel area — content lifecycle managed manually so all panels
+                  stay in the DOM (iframes would lose state if unmounted).
+                  TabsContent is intentionally omitted; Tabs only drives selection. */}
               <div className="relative flex-1 overflow-hidden">
                 {panels.length === 0 && (
                   <div className="text-muted-foreground absolute inset-0 flex items-center justify-center text-sm">
@@ -408,7 +358,7 @@ export default function ChatPage() {
                   </div>
                 )}
 
-                {/* Loading / failed placeholder for the active panel before it has content */}
+                {/* Loading / failed placeholder for the active panel */}
                 {(() => {
                   const active = panels.find(
                     (p) => p.panelId === effectiveActivePanelId
@@ -424,8 +374,8 @@ export default function ChatPage() {
                 })()}
 
                 {/* All panels kept in DOM to preserve state; shown/hidden via display.
-              Iframe panels use a stable callback-ref pattern (React-recommended for
-              dynamic ref lists). Native panels render their component directly. */}
+                    Iframe panels use a stable callback-ref pattern (React-recommended for
+                    dynamic ref lists). Native panels render their component directly. */}
                 {/* eslint-disable react-hooks/refs */}
                 {panels.map((panel) => {
                   const isActive = panel.panelId === effectiveActivePanelId;
@@ -481,7 +431,7 @@ export default function ChatPage() {
                 })}
                 {/* eslint-enable react-hooks/refs */}
               </div>
-            </div>
+            </Tabs>
           </div>
         </SidebarInset>
       </div>
