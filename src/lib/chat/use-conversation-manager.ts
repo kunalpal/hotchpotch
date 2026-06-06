@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useRef, useState } from 'react';
+import { type MutableRefObject, useCallback, useRef, useState } from 'react';
 import { useChat } from '@ai-sdk/react';
 import { generateId } from 'ai';
 import type { UIMessage } from 'ai';
@@ -8,7 +8,11 @@ import type { RuntimeManager } from '@/lib/runtime/runtime-manager';
 
 const INJECTED_PREFIX = '__injected__';
 
-export function useConversationManager(runtimeManager: RuntimeManager) {
+// Accepts a ref so the hook never reads runtimeManager.current during render —
+// only inside callbacks (onToolCall, handleSubmit), satisfying react-hooks/immutability.
+export function useConversationManager(
+  runtimeManagerRef: MutableRefObject<RuntimeManager>
+) {
   const [input, setInput] = useState('');
   const activePanelId = useRef<string | null>(null);
 
@@ -21,7 +25,7 @@ export function useConversationManager(runtimeManager: RuntimeManager) {
         payload: unknown;
       };
       activePanelId.current = widget_id;
-      runtimeManager.onRenderWidget(
+      runtimeManagerRef.current.onRenderWidget(
         widget_id,
         payload,
         update_strategy ?? 'mount'
@@ -55,9 +59,8 @@ export function useConversationManager(runtimeManager: RuntimeManager) {
 
       let text = trimmed;
 
-      // Flush passive widget context into this turn
       if (activePanelId.current) {
-        const buffered = runtimeManager.flushPassiveBuffer(
+        const buffered = runtimeManagerRef.current.flushPassiveBuffer(
           activePanelId.current
         );
         if (buffered.length > 0) {
@@ -71,7 +74,7 @@ export function useConversationManager(runtimeManager: RuntimeManager) {
       setInput('');
       sendMessage({ text });
     },
-    [input, status, sendMessage, runtimeManager]
+    [input, status, sendMessage, runtimeManagerRef]
   );
 
   const injectTurn = useCallback(

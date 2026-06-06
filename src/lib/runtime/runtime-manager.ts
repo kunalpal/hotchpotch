@@ -19,6 +19,7 @@ export class RuntimeManager {
   onWidgetReady: ((panelId: string) => void) | null = null;
   onWidgetFailed: ((panelId: string) => void) | null = null;
   onInjectTurn: ((content: string) => void) | null = null;
+  onRenderWidgetStarted: ((panelId: string) => void) | null = null;
 
   start(): void {
     this.messageListener = this.handleMessage.bind(this);
@@ -65,6 +66,7 @@ export class RuntimeManager {
     payload: unknown,
     updateStrategy: 'mount' | 'replace'
   ): void {
+    this.onRenderWidgetStarted?.(panelId);
     const record = this.registry.get(panelId);
     if (!record) return;
 
