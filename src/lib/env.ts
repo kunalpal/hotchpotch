@@ -6,6 +6,7 @@ const envSchema = z.object({
   BETTER_AUTH_SECRET: z.string().min(1, 'BETTER_AUTH_SECRET is required'),
   BETTER_AUTH_URL: z.url('BETTER_AUTH_URL must be a valid URL'),
   NEXT_PUBLIC_SITE_URL: z.url('NEXT_PUBLIC_SITE_URL must be a valid URL'),
+  AI_GATEWAY_API_KEY: z.string().min(1, 'AI_GATEWAY_API_KEY is required'),
   // Optional with defaults
   LOG_LEVEL: z.string().default('info'),
 });
