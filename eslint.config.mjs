@@ -1,18 +1,42 @@
-import { defineConfig, globalIgnores } from "eslint/config";
-import nextVitals from "eslint-config-next/core-web-vitals";
-import nextTs from "eslint-config-next/typescript";
+import { defineConfig, globalIgnores } from 'eslint/config';
+import nextVitals from 'eslint-config-next/core-web-vitals';
+import nextTs from 'eslint-config-next/typescript';
+import prettier from 'eslint-config-prettier';
 
 const eslintConfig = defineConfig([
   ...nextVitals,
   ...nextTs,
-  // Override default ignores of eslint-config-next.
+  prettier,
   globalIgnores([
-    // Default ignores of eslint-config-next:
-    ".next/**",
-    "out/**",
-    "build/**",
-    "next-env.d.ts",
+    '.next/**',
+    'out/**',
+    'build/**',
+    'next-env.d.ts',
+    'node_modules/**',
+    '*.tsbuildinfo',
+    '.agents/**',
   ]),
+  // Disable no-explicit-any for test files to simplify mocking
+  {
+    files: ['**/*.test.ts', '**/*.test.tsx'],
+    rules: {
+      '@typescript-eslint/no-explicit-any': 'off',
+    },
+  },
+  // Server-side files: disallow console.*
+  {
+    files: ['src/lib/**/*.ts', 'src/app/api/**/*.ts', 'src/utils/**/*.ts'],
+    rules: {
+      'no-console': 'warn',
+    },
+  },
+  // Exclude db/scripts/ (CLI logger uses console intentionally)
+  {
+    files: ['src/db/scripts/**/*.ts'],
+    rules: {
+      'no-console': 'off',
+    },
+  },
 ]);
 
 export default eslintConfig;
