@@ -35,6 +35,7 @@ export default function ChatPage() {
   // Wire callbacks, start listener, and pre-mount the widget
   useEffect(() => {
     const rm = runtimeManagerRef.current;
+    let unmounted = false;
 
     rm.onInjectTurn = (content) => injectTurnRef.current?.(content);
     rm.onRenderWidgetStarted = () => setWidgetVisible(true);
@@ -46,15 +47,20 @@ export default function ChatPage() {
     manifestLoaderRef.current
       .load(MANIFEST_URL)
       .then((manifest) => {
-        if (iframeRef.current) {
+        if (!unmounted && iframeRef.current) {
           rm.mountWidget(PANEL_ID, iframeRef.current, manifest, null);
         }
       })
       .catch((err: unknown) => {
-        console.error('[ChatPage] Failed to load widget manifest:', err);
+        if (!unmounted) {
+          console.error('[ChatPage] Failed to load widget manifest:', err);
+        }
       });
 
-    return () => rm.stop();
+    return () => {
+      unmounted = true;
+      rm.stop();
+    };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
