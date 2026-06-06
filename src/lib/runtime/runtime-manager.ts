@@ -157,10 +157,16 @@ export class RuntimeManager {
     const validated = validateAction(event, this.registry);
     if (!validated) return;
 
-    const rendered = renderTemplate(
-      validated.template.template,
-      validated.sanitisedData
-    );
+    let rendered: string;
+    try {
+      rendered = renderTemplate(
+        validated.template.template,
+        validated.sanitisedData
+      );
+    } catch (err) {
+      console.error('[RuntimeManager] Template rendering failed:', err);
+      return;
+    }
 
     if (validated.template.urgency === 'active') {
       this.onInjectTurn?.(`[Widget] ${rendered}`);
