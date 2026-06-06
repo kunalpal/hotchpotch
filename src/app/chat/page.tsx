@@ -43,11 +43,16 @@ export default function ChatPage() {
 
     rm.start();
 
-    manifestLoaderRef.current.load(MANIFEST_URL).then((manifest) => {
-      if (iframeRef.current) {
-        rm.mountWidget(PANEL_ID, iframeRef.current, manifest, null);
-      }
-    });
+    manifestLoaderRef.current
+      .load(MANIFEST_URL)
+      .then((manifest) => {
+        if (iframeRef.current) {
+          rm.mountWidget(PANEL_ID, iframeRef.current, manifest, null);
+        }
+      })
+      .catch((err: unknown) => {
+        console.error('[ChatPage] Failed to load widget manifest:', err);
+      });
 
     return () => rm.stop();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
