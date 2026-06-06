@@ -183,7 +183,7 @@ export class RuntimeManager {
       return;
     }
 
-    if (validated.template.urgency === 'active') {
+    if (validated.urgency === 'active') {
       this.onInjectTurn?.(`[Widget] ${rendered}`);
     } else {
       this.passiveBuffers.get(validated.panelId)?.push(rendered);
