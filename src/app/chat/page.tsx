@@ -15,7 +15,6 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar';
-import Header from '@/components/layout/header';
 import { ChatSidebar } from '@/components/layout/chat-sidebar';
 import { cn } from '@/utils/ui';
 
@@ -245,7 +244,6 @@ export default function ChatPage() {
     <SidebarProvider className="h-screen">
       <ChatSidebar />
       <SidebarInset className="overflow-hidden">
-        <Header compact moduleName="Chat" />
         <div className="flex min-h-0 flex-1">
           {/* Left pane — chat */}
           <div className="border-border flex w-1/2 flex-none flex-col border-r">
