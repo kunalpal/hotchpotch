@@ -4,7 +4,7 @@
   "host_type": "native",
   "views": ["overview", "by_day"],
   "tools": [{ "name": "fetch_exchange_rate", "timeout_ms": 5000 }],
-  "skills": [],
+  "skills": [{ "type": "output_processor" }],
   "input_events": ["LINE_EDITED", "CURRENCY_CHANGED"],
   "action_templates": {
     "LINE_EDITED": {

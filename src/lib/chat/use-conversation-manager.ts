@@ -38,7 +38,7 @@ export function useConversationManager(
             payload: unknown;
           };
           activePanelId.current = widget_id;
-          runtimeManagerRef.current.onRenderWidget(
+          void runtimeManagerRef.current.onRenderWidget(
             widget_id,
             payload,
             update_strategy ?? 'mount'
@@ -145,7 +145,7 @@ export function useConversationManager(
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           setMessages((prev: any[]) => [...prev, userMsg, assistantMsg]);
           if (intercepted.widgetPayload !== null) {
-            rm.onRenderWidget(
+            void rm.onRenderWidget(
               intercepted.panelId,
               intercepted.widgetPayload,
               'replace'

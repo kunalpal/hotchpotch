@@ -87,11 +87,11 @@ export class RuntimeManager {
     return host;
   }
 
-  onRenderWidget(
+  async onRenderWidget(
     panelId: string,
     payload: unknown,
     updateStrategy: 'mount' | 'replace'
-  ): void {
+  ): Promise<void> {
     const host = this.hosts.get(panelId);
     if (!host) return;
     this.onRenderWidgetStarted?.(panelId);
@@ -109,8 +109,14 @@ export class RuntimeManager {
       }
     }
 
+    // Allow the widget's output_processor skill to enrich the payload before delivery
+    const enrichedPayload = await this.skillRouter.runOutputProcessor(
+      panelId,
+      payload
+    );
+
     const type = updateStrategy === 'replace' ? 'REPLACE' : 'MOUNT';
-    const envelope = createEnvelope(type, { payload });
+    const envelope = createEnvelope(type, { payload: enrichedPayload });
 
     if (host.status === 'ready') {
       host.send(envelope);

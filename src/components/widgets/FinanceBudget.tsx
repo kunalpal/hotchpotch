@@ -10,12 +10,53 @@ interface Props {
   host: NativeWidgetHost;
 }
 
+// Extended payload type — output_processor enriches the itinerary with per-day
+// cost hints (derived from destination data) before the widget receives it.
+type BudgetPayload = TravelItineraryPayload & {
+  costHints?: Record<string, number>;
+};
+
 const CURRENCIES = ['USD', 'EUR', 'GBP', 'JPY'];
 const BASE_COST_PER_DAY = 200;
 
 export function FinanceBudget({ host }: Props) {
-  const { payload, sendAction } = useWidgetHost<TravelItineraryPayload>(host);
-  // User edits keyed by line-item label; defaults to BASE_COST_PER_DAY
+  const { payload, sendAction } = useWidgetHost<BudgetPayload>(
+    host,
+    (envelope) => {
+      if (envelope.type !== 'SKILL_INVOKE') return;
+      const { skill_id, type, query } = envelope.payload as {
+        skill_id: string;
+        type: string;
+        query: unknown;
+      };
+      if (type !== 'output_processor') return;
+
+      // Derive per-day cost hints from the itinerary payload.
+      // Mock: 200 USD/day for all destinations.
+      const itinerary = query as TravelItineraryPayload | null;
+      const costHints: Record<string, number> = {};
+      if (itinerary?.days) {
+        itinerary.days.forEach((day, i) => {
+          costHints[`Day ${i + 1} — ${day.location}`] = BASE_COST_PER_DAY;
+        });
+      }
+
+      host.receiveFromWidget({
+        protocol: 'HOTCHPOTCH_WIDGET_V1' as const,
+        message_id: crypto.randomUUID(),
+        reply_to: null,
+        type: 'SKILL_RESULT',
+        timestamp: Date.now(),
+        payload: {
+          skill_id,
+          type: 'output_processor',
+          result: { ...itinerary, costHints },
+        },
+      });
+    }
+  );
+
+  // User edits keyed by line-item label; defaults to costHints from output_processor
   const [userAmounts, setUserAmounts] = useState<Map<string, string>>(
     new Map()
   );
@@ -27,9 +68,10 @@ export function FinanceBudget({ host }: Props) {
     if (!payload?.days) return [];
     return payload.days.map((day, i) => {
       const label = `Day ${i + 1} — ${day.location}`;
+      const defaultCost = payload.costHints?.[label] ?? BASE_COST_PER_DAY;
       return {
         label,
-        amount: userAmounts.get(label) ?? String(BASE_COST_PER_DAY),
+        amount: userAmounts.get(label) ?? String(defaultCost),
       };
     });
   }, [payload, userAmounts]);
