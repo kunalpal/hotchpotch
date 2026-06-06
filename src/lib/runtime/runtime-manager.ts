@@ -9,6 +9,7 @@ import type { WidgetHost } from '@/lib/runtime/widget-host';
 import { IframeWidgetHost } from '@/lib/runtime/iframe-widget-host';
 import { NativeWidgetHost } from '@/lib/runtime/native-widget-host';
 import { PendingContextBuffer } from '@/lib/runtime/pending-context-buffer';
+import { ToolDispatcher } from '@/lib/runtime/tool-dispatcher';
 import { validateAction } from '@/lib/runtime/injection-guard';
 import { renderTemplate } from '@/lib/runtime/template-renderer';
 
@@ -17,16 +18,24 @@ export class RuntimeManager {
   private passiveBuffers = new Map<string, PendingContextBuffer>();
   private messageListener: ((event: MessageEvent) => void) | null = null;
 
+  readonly toolDispatcher = new ToolDispatcher();
+
   onWidgetReady: ((panelId: string) => void) | null = null;
   onWidgetFailed: ((panelId: string) => void) | null = null;
   onPanelUnmounted: ((panelId: string) => void) | null = null;
   onBackgroundToolComplete: ((panelId: string) => void) | null = null;
+  onToolRegistryUpdate: ((add: string[], remove: string[]) => void) | null =
+    null;
   onInjectTurn: ((content: string) => void) | null = null;
   onRenderWidgetStarted: ((panelId: string) => void) | null = null;
 
   start(): void {
     this.messageListener = this.handleMessage.bind(this);
     window.addEventListener('message', this.messageListener);
+
+    this.toolDispatcher.onBackgroundComplete = (panelId) => {
+      this.onBackgroundToolComplete?.(panelId);
+    };
   }
 
   stop(): void {
@@ -109,6 +118,10 @@ export class RuntimeManager {
     this.onPanelUnmounted?.(panelId);
   }
 
+  getHost(panelId: string): WidgetHost | undefined {
+    return this.hosts.get(panelId);
+  }
+
   flushPassiveBuffer(panelId: string): string[] {
     return this.passiveBuffers.get(panelId)?.flush() ?? [];
   }
@@ -158,10 +171,43 @@ export class RuntimeManager {
         this.handleAction(panelId, envelope);
         break;
       case 'REGISTER_TOOLS':
+        this.handleRegisterTools(panelId, envelope);
+        break;
+      case 'TOOL_RESULT':
+        this.toolDispatcher.handleToolResult(envelope);
+        break;
       case 'REGISTER_SKILLS':
-        // Phase 3+ — no-op until Task 25
+        // Phase 3+ Skills — no-op until Task 28
         break;
     }
+  }
+
+  private handleRegisterTools(
+    panelId: string,
+    envelope: InboundEnvelope
+  ): void {
+    if (envelope.type !== 'REGISTER_TOOLS') return;
+    const host = this.hosts.get(panelId);
+    if (!host) return;
+
+    const { tools } = envelope.payload;
+    const declaredNames = new Set(host.manifest.tools.map((t) => t.name));
+
+    // Reject entire registration if any tool is not declared in the manifest
+    for (const tool of tools) {
+      if (!declaredNames.has(tool.name)) {
+        console.warn(
+          `[RuntimeManager] Undeclared tool "${tool.name}" from panel ${panelId} — rejecting registration`
+        );
+        host.status = 'failed';
+        this.onWidgetFailed?.(panelId);
+        return;
+      }
+    }
+
+    const namespaced = tools.map((t) => `${panelId}__${t.name}`);
+    host.registeredTools = namespaced;
+    this.onToolRegistryUpdate?.(namespaced, []);
   }
 
   private handleReady(panelId: string): void {
