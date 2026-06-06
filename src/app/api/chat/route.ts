@@ -1,15 +1,93 @@
 import {
   convertToModelMessages,
   gateway,
+  simulateReadableStream,
   streamText,
   tool,
   UIMessage,
 } from 'ai';
+import type { LanguageModelV3StreamPart } from '@ai-sdk/provider';
+import { MockLanguageModelV3 } from 'ai/test';
 import { z } from 'zod';
 import { env } from '@/lib/env';
 
-// Silence the unused import warning — env is accessed for side-effect validation
+// Triggers env validation at startup so misconfiguration fails fast
 void env;
+
+const MOCK_ITINERARY_PAYLOAD = {
+  days: [
+    {
+      date: '2025-08-01',
+      location: 'Tokyo, Japan',
+      activities: [
+        'Tsukiji fish market',
+        'Senso-ji temple',
+        'Shinjuku evening walk',
+      ],
+    },
+    {
+      date: '2025-08-02',
+      location: 'Kyoto, Japan',
+      activities: [
+        'Fushimi Inari shrine',
+        'Arashiyama bamboo grove',
+        'Gion district dinner',
+      ],
+    },
+    {
+      date: '2025-08-03',
+      location: 'Osaka, Japan',
+      activities: [
+        'Dotonbori street food tour',
+        'Osaka Castle',
+        'Namba shopping',
+      ],
+    },
+  ],
+};
+
+function buildMockModel() {
+  return new MockLanguageModelV3({
+    doStream: async () => ({
+      stream: simulateReadableStream({
+        initialDelayInMs: 0,
+        chunkDelayInMs: 0,
+        chunks: [
+          { type: 'text-start', id: 'text-1' },
+          {
+            type: 'text-delta',
+            id: 'text-1',
+            delta: '[MOCK] Here is a sample travel itinerary!',
+          },
+          { type: 'text-end', id: 'text-1' },
+          {
+            type: 'tool-call',
+            toolCallId: 'mock-call-1',
+            toolName: 'render_widget',
+            input: JSON.stringify({
+              widget_id: 'travel.itinerary',
+              update_strategy: 'mount',
+              payload: MOCK_ITINERARY_PAYLOAD,
+            }),
+          },
+          {
+            type: 'finish',
+            finishReason: { unified: 'tool-calls', raw: undefined },
+            usage: {
+              inputTokens: {
+                total: 0,
+                noCache: 0,
+                cacheRead: 0,
+                cacheWrite: 0,
+              },
+              outputTokens: { total: 0, text: 0 },
+            },
+          },
+        ] as LanguageModelV3StreamPart[],
+      }),
+    }),
+  });
+}
 
 const RequestBodySchema = z.object({
   messages: z.array(z.unknown()),
@@ -30,8 +108,13 @@ export async function POST(request: Request) {
 
   const messages = parsed.data.messages as UIMessage[];
 
+  const model =
+    process.env.MOCK_AI === 'true'
+      ? buildMockModel()
+      : gateway('deepseek/deepseek-v4-flash');
+
   const result = streamText({
-    model: gateway('deepseek/deepseek-v4-flash'),
+    model,
     system: `You are HotchPotch, an AI assistant with access to interactive widgets.
 When the user asks about travel planning, trips, or itineraries, call render_widget with widget_id "travel.itinerary" and a fully populated payload.
 Always include specific dates, locations, and concrete activities — never use placeholders.`,
