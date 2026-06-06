@@ -1,0 +1,27 @@
+{
+  "widget_id": "data.notes",
+  "name": "Notes",
+  "host_type": "native",
+  "views": ["list", "single"],
+  "tools": [],
+  "skills": [],
+  "input_events": ["NOTE_DELETED", "NOTE_PINNED"],
+  "action_templates": {
+    "NOTE_DELETED": {
+      "action_type": "NOTE_DELETED",
+      "template": "User deleted the note '{data.title}'.",
+      "urgency": "active",
+      "schema": {
+        "title": { "type": "string", "max_length": 100 }
+      }
+    },
+    "NOTE_PINNED": {
+      "action_type": "NOTE_PINNED",
+      "template": "User pinned the note '{data.title}'.",
+      "urgency": "passive",
+      "schema": {
+        "title": { "type": "string", "max_length": 100 }
+      }
+    }
+  }
+}
