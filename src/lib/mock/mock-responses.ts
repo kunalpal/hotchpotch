@@ -190,7 +190,11 @@ export function buildMockChunks(
           't1',
           '[MOCK] The Notes widget is open — jot things down anytime.'
         ),
-        finishChunk(false),
+        // render_widget with an empty payload so the mount is persisted and
+        // can be replayed on reload. DataNotes ignores the MOUNT envelope and
+        // manages its own state internally.
+        renderWidget('tc1', 'data.notes', {}),
+        finishChunk(true),
       ];
     default:
       return [
