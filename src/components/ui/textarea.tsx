@@ -15,8 +15,12 @@ const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(
     const adjustHeight = React.useCallback(() => {
       const textarea = internalRef.current;
       if (textarea) {
-        textarea.style.height = 'auto';
-        textarea.style.height = `${textarea.scrollHeight}px`;
+        if (!textarea.value) {
+          textarea.style.height = '';
+        } else {
+          textarea.style.height = 'auto';
+          textarea.style.height = `${textarea.scrollHeight}px`;
+        }
       }
     }, []);
 
