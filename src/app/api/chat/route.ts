@@ -51,7 +51,7 @@ export async function POST(request: Request) {
   const messages = parsed.data.messages as UIMessage[];
 
   const model =
-    process.env.MOCK_AI === 'true'
+    process.env.NEXT_PUBLIC_MOCK_AI === 'true'
       ? buildMockModel()
       : gateway('deepseek/deepseek-v4-flash');
 

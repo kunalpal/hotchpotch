@@ -33,7 +33,7 @@ export async function POST(request: Request) {
   }
 
   // When running with a mock AI, detect trigger from the message and return matching widgets
-  if (process.env.MOCK_AI === 'true') {
+  if (process.env.NEXT_PUBLIC_MOCK_AI === 'true') {
     return Response.json({
       widget_ids: mockWidgetIds(detectTrigger(parsed.message)),
     });

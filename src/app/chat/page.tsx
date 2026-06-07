@@ -11,11 +11,33 @@ import { useConversationManager } from '@/lib/chat/use-conversation-manager';
 import { TravelMap } from '@/components/widgets/TravelMap';
 import { FinanceBudget } from '@/components/widgets/FinanceBudget';
 import { DataNotes } from '@/components/widgets/DataNotes';
+import { ChevronDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { ButtonGroup } from '@/components/ui/button-group';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { Textarea } from '@/components/ui/textarea';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ChatSidebar } from '@/components/layout/chat-sidebar';
 import { cn } from '@/utils/ui';
+import type { MockTrigger } from '@/lib/mock/mock-responses';
+
+const IS_MOCK_MODE = process.env.NEXT_PUBLIC_MOCK_AI === 'true';
+
+const MOCK_TRIGGER_OPTIONS: Array<{
+  trigger: MockTrigger;
+  label: string;
+  message: string;
+}> = [
+  { trigger: 'travel', label: 'Travel', message: 'plan a trip to Japan' },
+  { trigger: 'budget', label: 'Budget', message: 'show me a budget breakdown' },
+  { trigger: 'notes', label: 'Notes', message: 'open my notes' },
+  { trigger: 'default', label: 'Default', message: 'hello' },
+];
 
 const NATIVE_WIDGET_COMPONENTS: Record<
   string,
@@ -126,6 +148,7 @@ export default function ChatPage() {
     input,
     handleInputChange,
     handleSubmit,
+    sendDirectMessage,
     isLoading,
     injectTurn,
   } = useConversationManager(runtimeManagerRef, onBeforeSend);
@@ -274,9 +297,34 @@ export default function ChatPage() {
                 }
               }}
             />
-            <Button type="submit" disabled={isLoading || !input.trim()}>
-              Send
-            </Button>
+            {IS_MOCK_MODE ? (
+              <ButtonGroup>
+                <Button type="submit" disabled={isLoading || !input.trim()}>
+                  Send
+                </Button>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button type="button" disabled={isLoading} className="px-2">
+                      <ChevronDown className="h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    {MOCK_TRIGGER_OPTIONS.map(({ trigger, label, message }) => (
+                      <DropdownMenuItem
+                        key={trigger}
+                        onClick={() => sendDirectMessage(message)}
+                      >
+                        {label}
+                      </DropdownMenuItem>
+                    ))}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </ButtonGroup>
+            ) : (
+              <Button type="submit" disabled={isLoading || !input.trim()}>
+                Send
+              </Button>
+            )}
           </form>
         </div>
 

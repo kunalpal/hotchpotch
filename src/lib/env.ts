@@ -8,7 +8,7 @@ const envSchema = z.object({
   NEXT_PUBLIC_SITE_URL: z.url('NEXT_PUBLIC_SITE_URL must be a valid URL'),
   GOOGLE_CLIENT_ID: z.string().min(1, 'GOOGLE_CLIENT_ID is required'),
   GOOGLE_CLIENT_SECRET: z.string().min(1, 'GOOGLE_CLIENT_SECRET is required'),
-  // Optional when MOCK_AI=true; the gateway provider itself will error at call-time if missing
+  // Optional when NEXT_PUBLIC_MOCK_AI=true; the gateway provider itself will error at call-time if missing
   AI_GATEWAY_API_KEY: z.string().default(''),
   // Optional with defaults
   LOG_LEVEL: z.string().default('info'),

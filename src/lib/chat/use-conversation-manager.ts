@@ -114,75 +114,78 @@ export function useConversationManager(
     []
   );
 
+  const doSend = useCallback(
+    async (trimmed: string) => {
+      const rm = runtimeManagerRef.current;
+      const intercepted = await rm.skillRouter.runInterceptors(trimmed);
+      if (intercepted) {
+        const userMsg = {
+          id: generateId(),
+          role: 'user' as const,
+          content: trimmed,
+          parts: [{ type: 'text' as const, text: trimmed }],
+        };
+        const assistantMsg = {
+          id: generateId(),
+          role: 'assistant' as const,
+          content: intercepted.response,
+          parts: [{ type: 'text' as const, text: intercepted.response }],
+        };
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        setMessages((prev: any[]) => [...prev, userMsg, assistantMsg]);
+        if (intercepted.widgetPayload !== null) {
+          void rm.onRenderWidget(
+            intercepted.panelId,
+            intercepted.widgetPayload,
+            'replace'
+          );
+        }
+        return;
+      }
+
+      const contextLines = onBeforeSend ? await onBeforeSend(trimmed) : [];
+
+      let text = trimmed;
+
+      if (lastRenderedWidgetIdRef.current) {
+        const buffered = runtimeManagerRef.current.flushPassiveBuffer(
+          lastRenderedWidgetIdRef.current
+        );
+        if (buffered.length > 0) {
+          const context = buffered
+            .map((t) => `[Widget context: ${t}]`)
+            .join('\n');
+          text = `${context}\n\n${text}`;
+        }
+      }
+
+      if (contextLines.length > 0) {
+        const injected = contextLines.map((l) => `[Context: ${l}]`).join('\n');
+        text = `${injected}\n\n${text}`;
+      }
+      sendMessage({ text });
+    },
+    [sendMessage, setMessages, runtimeManagerRef, onBeforeSend]
+  );
+
   const handleSubmit = useCallback(
     (e: React.FormEvent<HTMLFormElement>) => {
       e.preventDefault();
       const trimmed = input.trim();
       if (!trimmed || status !== 'ready') return;
-
       setInput('');
-
-      const doSend = async () => {
-        // Check for intent interceptors first. If a mounted widget handles this
-        // intent fully, inject a synthetic turn and skip the model call entirely.
-        const rm = runtimeManagerRef.current;
-        const intercepted = await rm.skillRouter.runInterceptors(trimmed);
-        if (intercepted) {
-          const userMsg = {
-            id: generateId(),
-            role: 'user' as const,
-            content: trimmed,
-            parts: [{ type: 'text' as const, text: trimmed }],
-          };
-          const assistantMsg = {
-            id: generateId(),
-            role: 'assistant' as const,
-            content: intercepted.response,
-            parts: [{ type: 'text' as const, text: intercepted.response }],
-          };
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          setMessages((prev: any[]) => [...prev, userMsg, assistantMsg]);
-          if (intercepted.widgetPayload !== null) {
-            void rm.onRenderWidget(
-              intercepted.panelId,
-              intercepted.widgetPayload,
-              'replace'
-            );
-          }
-          return;
-        }
-
-        // Run pre-send hook (widget selection + context injectors)
-        const contextLines = onBeforeSend ? await onBeforeSend(trimmed) : [];
-
-        let text = trimmed;
-
-        if (lastRenderedWidgetIdRef.current) {
-          const buffered = runtimeManagerRef.current.flushPassiveBuffer(
-            lastRenderedWidgetIdRef.current
-          );
-          if (buffered.length > 0) {
-            const context = buffered
-              .map((t) => `[Widget context: ${t}]`)
-              .join('\n');
-            text = `${context}\n\n${text}`;
-          }
-        }
-
-        // Prepend skill-injected context lines to the message text —
-        // same pattern as the passive buffer, keeping both in the user turn
-        if (contextLines.length > 0) {
-          const injected = contextLines
-            .map((l) => `[Context: ${l}]`)
-            .join('\n');
-          text = `${injected}\n\n${text}`;
-        }
-        sendMessage({ text });
-      };
-
-      void doSend();
+      void doSend(trimmed);
     },
-    [input, status, sendMessage, setMessages, runtimeManagerRef, onBeforeSend]
+    [input, status, doSend]
+  );
+
+  const sendDirectMessage = useCallback(
+    (text: string) => {
+      const trimmed = text.trim();
+      if (!trimmed || status !== 'ready') return;
+      void doSend(trimmed);
+    },
+    [status, doSend]
   );
 
   const injectTurn = useCallback(
@@ -198,6 +201,7 @@ export function useConversationManager(
     input,
     handleInputChange,
     handleSubmit,
+    sendDirectMessage,
     isLoading: status === 'submitted' || status === 'streaming',
     injectTurn,
   };
