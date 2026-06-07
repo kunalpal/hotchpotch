@@ -1,6 +1,6 @@
 import { v4 as uuidv4 } from 'uuid';
 import { PROTOCOL_VERSION } from '@/lib/widget-protocol';
-import type { InboundEnvelope } from '@/lib/widget-protocol';
+import type { Envelope, InboundEnvelope } from '@/lib/widget-protocol';
 import type { WidgetHost } from '@/lib/runtime/widget-host';
 
 const SKILL_TIMEOUT_MS = 3000;
@@ -21,8 +21,14 @@ interface PendingSkill {
  */
 export class SkillRouter {
   private pending = new Map<string, PendingSkill>();
+  private sendFn: (host: WidgetHost, envelope: Envelope) => void = (h, e) =>
+    h.send(e);
 
   constructor(private readonly hosts: Map<string, WidgetHost>) {}
+
+  setSendFn(fn: (host: WidgetHost, envelope: Envelope) => void): void {
+    this.sendFn = fn;
+  }
 
   /**
    * Fires all registered context_injector skills whose triggers match the
@@ -147,7 +153,7 @@ export class SkillRouter {
 
       this.pending.set(skillId, { resolve, timer });
 
-      host.send({
+      this.sendFn(host, {
         protocol: PROTOCOL_VERSION,
         message_id: uuidv4(),
         reply_to: null,

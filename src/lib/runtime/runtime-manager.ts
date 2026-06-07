@@ -3,7 +3,7 @@ import {
   InboundEnvelopeSchema,
   WIDGET_PAYLOAD_SCHEMAS,
 } from '@/lib/widget-protocol';
-import type { InboundEnvelope } from '@/lib/widget-protocol';
+import type { Envelope, InboundEnvelope } from '@/lib/widget-protocol';
 import type { WidgetManifest } from '@/lib/widget-manifest';
 import type { WidgetHost } from '@/lib/runtime/widget-host';
 import { IframeWidgetHost } from '@/lib/runtime/iframe-widget-host';
@@ -11,6 +11,7 @@ import { NativeWidgetHost } from '@/lib/runtime/native-widget-host';
 import { PendingContextBuffer } from '@/lib/runtime/pending-context-buffer';
 import { ToolDispatcher } from '@/lib/runtime/tool-dispatcher';
 import { SkillRouter } from '@/lib/runtime/skill-router';
+import { MessageBus } from '@/lib/runtime/message-bus';
 import { validateAction } from '@/lib/runtime/injection-guard';
 import { renderTemplate } from '@/lib/runtime/template-renderer';
 
@@ -26,6 +27,10 @@ interface RuntimeCallbacks {
 export class RuntimeManager {
   private hosts = new Map<string, WidgetHost>();
   private passiveBuffers = new Map<string, PendingContextBuffer>();
+  private pendingRenders = new Map<
+    string,
+    Array<{ payload: unknown; updateStrategy: 'mount' | 'replace' }>
+  >();
   private messageListener: ((event: MessageEvent) => void) | null = null;
   private callbacks: RuntimeCallbacks = {
     onWidgetFailed: null,
@@ -36,6 +41,7 @@ export class RuntimeManager {
     onRenderWidgetStarted: null,
   };
 
+  readonly bus = new MessageBus();
   readonly toolDispatcher = new ToolDispatcher();
   readonly skillRouter = new SkillRouter(this.hosts);
 
@@ -44,6 +50,15 @@ export class RuntimeManager {
   }
 
   start(): void {
+    this.bus.onInbound((panelId, envelope) =>
+      this.handleInbound(panelId, envelope)
+    );
+
+    const sendFn = (host: WidgetHost, envelope: Envelope) =>
+      this.bus.send(host, envelope);
+    this.toolDispatcher.setSendFn(sendFn);
+    this.skillRouter.setSendFn(sendFn);
+
     this.messageListener = this.handleMessage.bind(this);
     window.addEventListener('message', this.messageListener);
 
@@ -65,26 +80,49 @@ export class RuntimeManager {
     manifest: WidgetManifest,
     widgetSrc: string
   ): void {
+    const pending = this.pendingRenders.get(panelId);
+    this.bus.lifecycle('iframe-host-registered', panelId, {
+      widgetId: manifest.widget_id,
+      hasPendingRenders: !!pending,
+      pendingCount: pending?.length ?? 0,
+    });
+
     const origin = new URL(widgetSrc, window.location.href).origin;
     const host = new IframeWidgetHost(panelId, iframeEl, manifest, origin);
 
     host.startReadyTimeout(() => {
       host.status = 'failed';
+      this.bus.lifecycle('widget-failed', panelId, { reason: 'ready-timeout' });
       this.callbacks.onWidgetFailed?.(panelId);
     });
 
-    host.onMessage((envelope) => this.handleInbound(panelId, envelope));
+    host.onMessage((envelope) => this.bus.receive(panelId, envelope));
     this.hosts.set(panelId, host);
     this.passiveBuffers.set(panelId, new PendingContextBuffer());
+
+    if (pending) {
+      this.pendingRenders.delete(panelId);
+      this.bus.lifecycle('pending-render-flushed', panelId, {
+        count: pending.length,
+      });
+      for (const { payload, updateStrategy } of pending) {
+        void this.onRenderWidget(panelId, payload, updateStrategy);
+      }
+    }
   }
 
   mountNativeWidget(
     panelId: string,
     manifest: WidgetManifest
   ): NativeWidgetHost {
+    this.bus.lifecycle('native-host-registered', panelId, {
+      widgetId: manifest.widget_id,
+      toolCount: manifest.tools.length,
+    });
+
     const host = new NativeWidgetHost(panelId, manifest);
 
-    host.onMessage((envelope) => this.handleInbound(panelId, envelope));
+    host.onMessage((envelope) => this.bus.receive(panelId, envelope));
     this.hosts.set(panelId, host);
     this.passiveBuffers.set(panelId, new PendingContextBuffer());
 
@@ -105,7 +143,17 @@ export class RuntimeManager {
     updateStrategy: 'mount' | 'replace'
   ): Promise<void> {
     const host = this.hosts.get(panelId);
-    if (!host) return;
+    if (!host) {
+      const queue = this.pendingRenders.get(panelId) ?? [];
+      queue.push({ payload, updateStrategy });
+      this.pendingRenders.set(panelId, queue);
+      this.bus.lifecycle('outbound-queued-pending-renders', panelId, {
+        updateStrategy,
+        queueLength: queue.length,
+        reason: 'no-host-yet',
+      });
+      return;
+    }
     this.callbacks.onRenderWidgetStarted?.(panelId);
 
     // Validate payload against the widget's registered schema
@@ -131,19 +179,34 @@ export class RuntimeManager {
     const envelope = createEnvelope(type, { payload: enrichedPayload });
 
     if (host.status === 'ready') {
-      host.send(envelope);
+      this.bus.send(host, envelope);
     } else if (host.status === 'loading') {
+      this.bus.lifecycle('outbound-queued-loading', panelId, {
+        type: envelope.type,
+        reason: 'host-not-ready',
+      });
       host.pendingOutbound.push(envelope);
     }
   }
 
   unmountWidget(panelId: string): void {
     const host = this.hosts.get(panelId);
-    if (!host) return;
-    host.dispose();
-    this.hosts.delete(panelId);
-    this.passiveBuffers.delete(panelId);
+    this.bus.lifecycle('widget-unmounting', panelId, {
+      hadHost: !!host,
+      hostStatus: host?.status ?? 'none',
+      hasPendingRenders: this.pendingRenders.has(panelId),
+      pendingRenderCount: this.pendingRenders.get(panelId)?.length ?? 0,
+    });
+    if (host) {
+      host.dispose();
+      this.hosts.delete(panelId);
+      this.passiveBuffers.delete(panelId);
+    }
+    // Always clean up pending renders and notify the UI, even if the iframe host
+    // never registered (panel closed before the element was bound to the DOM).
+    this.pendingRenders.delete(panelId);
     this.callbacks.onPanelUnmounted?.(panelId);
+    this.bus.lifecycle('widget-unmounted', panelId, {});
   }
 
   getHost(panelId: string): WidgetHost | undefined {
@@ -176,9 +239,6 @@ export class RuntimeManager {
       }
     }
     if (!matchedHost) return;
-
-    // Validate origin before parsing the envelope
-    if (!matchedHost.validateOrigin(event)) return;
 
     const parsed = InboundEnvelopeSchema.safeParse(event.data);
     if (!parsed.success) {
@@ -249,9 +309,12 @@ export class RuntimeManager {
       host.clearReadyTimeout();
     }
     host.status = 'ready';
+    this.bus.lifecycle('widget-ready', panelId, {
+      pendingOutboundCount: host.pendingOutbound.length,
+    });
 
     for (const envelope of host.pendingOutbound) {
-      host.send(envelope);
+      this.bus.send(host, envelope);
     }
     host.pendingOutbound = [];
   }

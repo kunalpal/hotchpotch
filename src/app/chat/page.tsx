@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ComponentType } from 'react';
 import type { UIMessage } from 'ai';
 import type { WidgetManifest } from '@/lib/widget-manifest';
+import { WidgetManifestSchema } from '@/lib/widget-manifest';
 import { RuntimeManager } from '@/lib/runtime/runtime-manager';
 import type { NativeWidgetHost } from '@/lib/runtime/native-widget-host';
 import { NATIVE_MANIFESTS } from '@/lib/widget-manifest-registry';
@@ -33,7 +34,8 @@ const MOCK_TRIGGER_OPTIONS: Array<{
   label: string;
   message: string;
 }> = [
-  { trigger: 'travel', label: 'Travel', message: 'plan a trip to Japan' },
+  { trigger: 'travel-itinerary', label: 'Itinerary', message: 'plan a trip to Japan' },
+  { trigger: 'travel-map', label: 'Map', message: 'show me a map of Japan' },
   { trigger: 'budget', label: 'Budget', message: 'show me a budget breakdown' },
   { trigger: 'notes', label: 'Notes', message: 'open my notes' },
   { trigger: 'default', label: 'Default', message: 'hello' },
@@ -84,6 +86,35 @@ export default function ChatPage() {
   const [activePanelId, setActivePanelId] = useState<string | null>(null);
   const [splitMode, setSplitMode] = useState(false);
 
+  const mountIframePanel = useCallback(async (widgetId: string) => {
+    if (mountedWidgetIdsRef.current.has(widgetId)) return;
+    const slug = widgetId.replace(/\./g, '-');
+    let manifest: WidgetManifest;
+    try {
+      const res = await fetch(`/widgets/${slug}/manifest.json`);
+      if (!res.ok) return;
+      manifest = WidgetManifestSchema.parse(await res.json());
+    } catch {
+      return;
+    }
+    mountedWidgetIdsRef.current.add(widgetId);
+    pendingMountsRef.current.set(widgetId, { manifest, widgetSrc: manifest.entry! });
+    setPanels((prev) => [
+      ...prev,
+      {
+        panelId: widgetId,
+        displayName: manifest.name,
+        hostType: 'iframe',
+        src: undefined,
+        nativeHost: undefined,
+        hasContent: false,
+        busy: false,
+        pulsing: false,
+        failed: false,
+      },
+    ]);
+  }, []);
+
   // Mounts a native widget panel and registers it with the runtime
   const mountNativePanel = useCallback((widgetId: string) => {
     if (mountedWidgetIdsRef.current.has(widgetId)) return;
@@ -125,7 +156,13 @@ export default function ChatPage() {
         });
         if (res.ok) {
           const { widget_ids } = (await res.json()) as { widget_ids: string[] };
-          for (const id of widget_ids) mountNativePanel(id);
+          for (const id of widget_ids) {
+            if (NATIVE_MANIFESTS[id]) {
+              mountNativePanel(id);
+            } else {
+              await mountIframePanel(id);
+            }
+          }
         }
       } catch {
         // non-fatal
@@ -140,7 +177,7 @@ export default function ChatPage() {
         return [];
       }
     },
-    [mountNativePanel]
+    [mountNativePanel, mountIframePanel]
   );
 
   const {
@@ -312,7 +349,10 @@ export default function ChatPage() {
                     {MOCK_TRIGGER_OPTIONS.map(({ trigger, label, message }) => (
                       <DropdownMenuItem
                         key={trigger}
-                        onClick={() => sendDirectMessage(message)}
+                        onClick={() => {
+                          panels.forEach((p) => closePanel(p.panelId));
+                          sendDirectMessage(message);
+                        }}
                       >
                         {label}
                       </DropdownMenuItem>

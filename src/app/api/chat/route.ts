@@ -85,11 +85,6 @@ export async function POST(request: Request) {
             .record(z.string(), z.unknown())
             .describe('Data payload conforming to the widget schema'),
         }),
-        execute: async ({ widget_id, update_strategy }) => {
-          // No-op: the client-side Runtime Manager intercepts this tool call
-          // and routes the payload to the widget iframe directly.
-          return { ok: true, widget_id, update_strategy };
-        },
       }),
       // Widget-registered tool: finance.budget → fetch_exchange_rate
       // The execute here is a server-side stub; real execution happens in the

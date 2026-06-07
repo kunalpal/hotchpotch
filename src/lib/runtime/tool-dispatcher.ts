@@ -1,5 +1,5 @@
 import { createEnvelope } from '@/lib/widget-protocol';
-import type { InboundEnvelope } from '@/lib/widget-protocol';
+import type { Envelope, InboundEnvelope } from '@/lib/widget-protocol';
 import type { WidgetHost } from '@/lib/runtime/widget-host';
 
 interface PendingCall {
@@ -18,8 +18,14 @@ interface PendingCall {
  */
 export class ToolDispatcher {
   private pending = new Map<string, PendingCall>();
+  private sendFn: (host: WidgetHost, envelope: Envelope) => void = (h, e) =>
+    h.send(e);
   /** Callback fired when a background tool completes while a different panel is active */
   onBackgroundComplete: ((panelId: string) => void) | null = null;
+
+  setSendFn(fn: (host: WidgetHost, envelope: Envelope) => void): void {
+    this.sendFn = fn;
+  }
 
   dispatch(
     toolUseId: string,
@@ -36,7 +42,8 @@ export class ToolDispatcher {
 
       this.pending.set(toolUseId, { resolve, reject, panelId, timer });
 
-      host.send(
+      this.sendFn(
+        host,
         createEnvelope('TOOL_INVOKE', {
           tool_use_id: toolUseId,
           name: toolName,
@@ -71,7 +78,7 @@ export class ToolDispatcher {
 
     this.pending.delete(toolUseId);
 
-    host.send(createEnvelope('TOOL_TIMEOUT', { tool_use_id: toolUseId }));
+    this.sendFn(host, createEnvelope('TOOL_TIMEOUT', { tool_use_id: toolUseId }));
     pending.reject(new Error(`Tool call ${toolUseId} timed out`));
   }
 

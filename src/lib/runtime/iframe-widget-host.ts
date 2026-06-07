@@ -45,7 +45,7 @@ export class IframeWidgetHost implements WidgetHost {
   }
 
   send(envelope: Envelope): void {
-    this.iframeRef.contentWindow?.postMessage(envelope, this.origin);
+    this.iframeRef.contentWindow?.postMessage(envelope, '*');
   }
 
   onMessage(handler: (envelope: InboundEnvelope) => void): void {

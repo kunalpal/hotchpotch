@@ -51,9 +51,9 @@ const EUROPE_ITINERARY = {
 
 // === Trigger detection ===
 
-export type MockTrigger = 'travel' | 'budget' | 'notes' | 'default';
+export type MockTrigger = 'travel-itinerary' | 'travel-map' | 'budget' | 'notes' | 'default';
 
-// Order matters: budget and notes take priority over travel
+// Order matters: more specific patterns first
 const TRIGGER_PATTERNS: Array<{ trigger: MockTrigger; pattern: RegExp }> = [
   {
     trigger: 'budget',
@@ -66,7 +66,11 @@ const TRIGGER_PATTERNS: Array<{ trigger: MockTrigger; pattern: RegExp }> = [
       /\b(note|notes|remember|jot|write(?: down)?|save|remind|keep track)\b/,
   },
   {
-    trigger: 'travel',
+    trigger: 'travel-map',
+    pattern: /\b(map|locations?|pins?|places? on|where is|geography)\b/,
+  },
+  {
+    trigger: 'travel-itinerary',
     pattern:
       /\b(trip|travel|itinerary|visit|vacation|holiday|flight|hotel|destination|tour|plan a|places?|japan|tokyo|kyoto|paris|europe|asia)\b/,
   },
@@ -96,7 +100,9 @@ export function lastUserText(prompt: LanguageModelV3Prompt): string {
 // Returns native widget IDs to pre-mount before the model responds
 export function mockWidgetIds(trigger: MockTrigger): string[] {
   switch (trigger) {
-    case 'travel':
+    case 'travel-itinerary':
+      return ['travel.itinerary'];
+    case 'travel-map':
       return ['travel.map'];
     case 'budget':
       return ['finance.budget'];
@@ -152,9 +158,15 @@ export function buildMockChunks(
   trigger: MockTrigger
 ): LanguageModelV3StreamPart[] {
   switch (trigger) {
-    case 'travel':
+    case 'travel-itinerary':
       return [
         ...textChunks('t1', '[MOCK] Here is a 3-day itinerary for Japan!'),
+        renderWidget('tc1', 'travel.itinerary', JAPAN_ITINERARY),
+        finishChunk(true),
+      ];
+    case 'travel-map':
+      return [
+        ...textChunks('t1', '[MOCK] Here are the locations on the map.'),
         renderWidget('tc1', 'travel.map', JAPAN_ITINERARY),
         finishChunk(true),
       ];
