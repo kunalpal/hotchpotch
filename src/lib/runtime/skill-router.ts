@@ -166,7 +166,9 @@ export class SkillRouter {
 
   private messageMatchesTriggers(message: string, triggers: string[]): boolean {
     if (triggers.length === 0) return false;
-    const lower = message.toLowerCase();
-    return triggers.some((t) => lower.includes(t.toLowerCase()));
+    return triggers.some((t) => {
+      const escaped = t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      return new RegExp(`\\b${escaped}\\b`, 'i').test(message);
+    });
   }
 }
