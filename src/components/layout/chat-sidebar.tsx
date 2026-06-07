@@ -281,7 +281,7 @@ export function ChatSidebar({ activeConversationId }: ChatSidebarProps) {
         </div>
 
         {/* User profile */}
-        <div className="border-border shrink-0 border-t p-2">
+        <div className={cn('shrink-0 p-2', open && 'border-border border-t')}>
           <UserFooter collapsed={!open} />
         </div>
       </aside>

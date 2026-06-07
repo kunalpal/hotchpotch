@@ -1,6 +1,7 @@
 import { ThemeProvider } from '@/components/theme-provider';
 import BProgressProvider from '@/components/providers/progress-provider';
 import '@/app/globals.css';
+import '@/app/markdown.css';
 import { Toaster } from '@/components/ui/sonner';
 import { Crimson_Pro, IBM_Plex_Sans } from 'next/font/google';
 import type { Metadata, Viewport } from 'next';

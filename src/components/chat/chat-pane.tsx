@@ -11,8 +11,10 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/utils/ui';
+import { MarkdownViewer } from '@/components/ui/markdown-viewer';
 import type { MockTrigger } from '@/lib/mock/mock-responses';
 
 const IS_MOCK_MODE = process.env.NEXT_PUBLIC_MOCK_AI === 'true';
@@ -59,30 +61,41 @@ export function ChatPane({
         className
       )}
     >
-      <ul className="m-0 flex flex-1 list-none flex-col gap-3 overflow-y-auto p-4">
-        {messages.map((message: UIMessage) => (
-          <li
-            key={message.id}
-            className={cn(
-              'max-w-[80%] rounded-lg px-3 py-2 text-sm wrap-break-word whitespace-pre-wrap',
-              message.role === 'user'
-                ? 'bg-primary text-primary-foreground self-end'
-                : 'bg-muted text-foreground self-start'
-            )}
-          >
-            {message.parts
-              .filter((p) => p.type === 'text')
-              .map((p, i) => (
-                <span key={i}>{p.text}</span>
-              ))}
-          </li>
-        ))}
-        {isLoading && (
-          <li className="text-muted-foreground self-start text-xs">
-            thinking…
-          </li>
-        )}
-      </ul>
+      <ScrollArea className="flex-1">
+        <ul className="m-0 mx-auto flex w-full max-w-4xl list-none flex-col gap-3 p-4">
+          {messages.map((message: UIMessage) => (
+            <li
+              key={message.id}
+              className={cn(
+                'max-w-[80%] rounded-lg px-3 py-2 text-sm wrap-break-word',
+                message.role === 'user'
+                  ? 'bg-primary text-primary-foreground self-end whitespace-pre-wrap'
+                  : 'bg-muted text-foreground self-start'
+              )}
+            >
+              {message.role === 'user'
+                ? message.parts
+                    .filter((p) => p.type === 'text')
+                    .map((p, i) => <span key={i}>{p.text}</span>)
+                : message.parts
+                    .filter((p) => p.type === 'text')
+                    .map((p, i) => (
+                      <MarkdownViewer
+                        key={i}
+                        content={p.text}
+                        variant="condensed"
+                        className="mx-0"
+                      />
+                    ))}
+            </li>
+          ))}
+          {isLoading && (
+            <li className="text-muted-foreground self-start text-xs">
+              thinking…
+            </li>
+          )}
+        </ul>
+      </ScrollArea>
 
       <form
         onSubmit={handleSubmit}
