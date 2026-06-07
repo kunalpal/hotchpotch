@@ -3,6 +3,7 @@
 import { useMemo, useState } from 'react';
 import { useWidgetHost } from '@/lib/hooks/use-widget-host';
 import type { NativeWidgetHost } from '@/lib/runtime/native-widget-host';
+import { PROTOCOL_VERSION } from '@/lib/widget-protocol';
 import type { TravelItineraryPayload } from '@/lib/widget-protocol';
 import { fetchExchangeRate } from '@/lib/actions/fetch-exchange-rate';
 import { Input } from '@/components/ui/input';
@@ -50,7 +51,7 @@ export function FinanceBudget({ host }: Props) {
       }
 
       host.receiveFromWidget({
-        protocol: 'HOTCHPOTCH_WIDGET_V1' as const,
+        protocol: PROTOCOL_VERSION,
         message_id: crypto.randomUUID(),
         reply_to: null,
         type: 'SKILL_RESULT',

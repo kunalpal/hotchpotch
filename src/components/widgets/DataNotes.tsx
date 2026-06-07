@@ -2,6 +2,7 @@
 
 import { useId, useLayoutEffect, useRef, useState } from 'react';
 import { useWidgetHost } from '@/lib/hooks/use-widget-host';
+import { PROTOCOL_VERSION } from '@/lib/widget-protocol';
 import type { NativeWidgetHost } from '@/lib/runtime/native-widget-host';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -19,9 +20,8 @@ interface Note {
   pinned: boolean;
 }
 
-let noteCounter = 0;
-
 export function DataNotes({ host }: Props) {
+  const noteCounterRef = useRef(0);
   const [notes, setNotes] = useState<Note[]>([]);
   // Keep a ref so the SKILL_INVOKE handler can always read the latest notes
   const notesRef = useRef(notes);
@@ -47,7 +47,7 @@ export function DataNotes({ host }: Props) {
           ? `Pinned notes: ${pinnedNotes.map((n) => `"${n.title}"${n.body ? ` — ${n.body}` : ''}`).join('; ')}`
           : '';
       host.receiveFromWidget({
-        protocol: 'HOTCHPOTCH_WIDGET_V1' as const,
+        protocol: PROTOCOL_VERSION,
         message_id: crypto.randomUUID(),
         reply_to: null,
         type: 'SKILL_RESULT',
@@ -70,7 +70,7 @@ export function DataNotes({ host }: Props) {
       setNotes((prev) => [
         ...prev,
         {
-          id: String(++noteCounter),
+          id: String(++noteCounterRef.current),
           title: noteTitle,
           body: noteBody,
           pinned: false,
@@ -78,7 +78,7 @@ export function DataNotes({ host }: Props) {
       ]);
 
       host.receiveFromWidget({
-        protocol: 'HOTCHPOTCH_WIDGET_V1' as const,
+        protocol: PROTOCOL_VERSION,
         message_id: crypto.randomUUID(),
         reply_to: null,
         type: 'SKILL_RESULT',
@@ -105,7 +105,7 @@ export function DataNotes({ host }: Props) {
     if (!title) return;
     setNotes((prev) => [
       ...prev,
-      { id: String(++noteCounter), title, body: body ?? '', pinned: false },
+      { id: String(++noteCounterRef.current), title, body: body ?? '', pinned: false },
     ]);
     if (titleRef.current) titleRef.current.value = '';
     if (bodyRef.current) bodyRef.current.value = '';

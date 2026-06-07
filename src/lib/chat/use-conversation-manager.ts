@@ -3,7 +3,7 @@
 import {
   type MutableRefObject,
   useCallback,
-  useLayoutEffect,
+  useEffect,
   useRef,
   useState,
 } from 'react';
@@ -22,7 +22,7 @@ export function useConversationManager(
   onBeforeSend?: (message: string) => Promise<string[]>
 ) {
   const [input, setInput] = useState('');
-  const activePanelId = useRef<string | null>(null);
+  const lastRenderedWidgetIdRef = useRef<string | null>(null);
   // Stable ref for addToolResult so the onToolCall closure can call it without
   // capturing a stale value. Typed as `any` to avoid the SDK's complex generic.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -37,7 +37,7 @@ export function useConversationManager(
             update_strategy?: 'mount' | 'replace';
             payload: unknown;
           };
-          activePanelId.current = widget_id;
+          lastRenderedWidgetIdRef.current = widget_id;
           void runtimeManagerRef.current.onRenderWidget(
             widget_id,
             payload,
@@ -85,9 +85,7 @@ export function useConversationManager(
     }
   );
 
-  // Sync addToolResult into a ref after each render so the onToolCall closure
-  // always has the latest version without reading it during render.
-  useLayoutEffect(() => {
+  useEffect(() => {
     addToolResultRef.current = addToolResult;
   });
 
@@ -159,9 +157,9 @@ export function useConversationManager(
 
         let text = trimmed;
 
-        if (activePanelId.current) {
+        if (lastRenderedWidgetIdRef.current) {
           const buffered = runtimeManagerRef.current.flushPassiveBuffer(
-            activePanelId.current
+            lastRenderedWidgetIdRef.current
           );
           if (buffered.length > 0) {
             const context = buffered

@@ -1,12 +1,6 @@
 'use client';
 
-import {
-  useCallback,
-  useEffect,
-  useLayoutEffect,
-  useRef,
-  useState,
-} from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import { PROTOCOL_VERSION } from '@/lib/widget-protocol';
 import type { Envelope, InboundEnvelope } from '@/lib/widget-protocol';
@@ -38,7 +32,7 @@ export function useWidgetHost<T = unknown>(
   // Ref so the bind handler always calls the latest onEnvelope without capturing a stale value
   const onEnvelopeRef = useRef(onEnvelope);
   // Updated outside render (react-hooks/refs) so the handler closure stays current
-  useLayoutEffect(() => {
+  useEffect(() => {
     onEnvelopeRef.current = onEnvelope;
   });
 
