@@ -15,11 +15,17 @@ import { ToolDispatcher } from '@/lib/runtime/tool-dispatcher';
 
 const INJECTED_PREFIX = '__injected__';
 
+type ConversationOptions = {
+  conversationId?: string;
+  initialMessages?: UIMessage[];
+};
+
 // Accepts a ref so the hook never reads runtimeManager.current during render —
 // only inside callbacks (onToolCall, handleSubmit), satisfying react-hooks/immutability.
 export function useConversationManager(
   runtimeManagerRef: MutableRefObject<RuntimeManager>,
-  onBeforeSend?: (message: string) => Promise<string[]>
+  onBeforeSend?: (message: string) => Promise<string[]>,
+  options?: ConversationOptions
 ) {
   const [input, setInput] = useState('');
   const lastRenderedWidgetIdRef = useRef<string | null>(null);
@@ -30,6 +36,10 @@ export function useConversationManager(
 
   const { messages, sendMessage, status, addToolResult, setMessages } = useChat(
     {
+      ...(options?.conversationId && {
+        body: { conversationId: options.conversationId },
+      }),
+      ...(options?.initialMessages && { messages: options.initialMessages }),
       onToolCall({ toolCall }) {
         if (toolCall.toolName === 'render_widget') {
           const { widget_id, update_strategy, payload } = toolCall.input as {

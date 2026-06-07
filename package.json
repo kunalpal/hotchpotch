@@ -17,7 +17,8 @@
     "test:watch": "vitest",
     "e2e": "npx playwright test",
     "e2e:ui": "npx playwright test --ui",
-    "drizzle:push:local": "dotenv -e .env.local -o -- drizzle-kit push"
+    "drizzle:push:local": "dotenv -e .env.local -o -- drizzle-kit push",
+    "db:seed": "dotenv -e .env.local -o -- npx tsx src/db/scripts/cli.ts"
   },
   "dependencies": {
     "@ai-sdk/react": "^3.0.199",

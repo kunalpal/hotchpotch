@@ -8,6 +8,7 @@ import {
 } from 'ai';
 import type { LanguageModelV3Prompt } from '@ai-sdk/provider';
 import { MockLanguageModelV3 } from 'ai/test';
+import { eq } from 'drizzle-orm';
 import { z } from 'zod';
 import { env } from '@/lib/env';
 import {
@@ -15,6 +16,9 @@ import {
   detectTrigger,
   lastUserText,
 } from '@/lib/mock/mock-responses';
+import { getAuthenticatedUser } from '@/utils/auth';
+import { db } from '@/utils/db';
+import { conversation, message } from '@/db/index';
 
 // Triggers env validation at startup so misconfiguration fails fast
 void env;
@@ -33,6 +37,7 @@ function buildMockModel() {
 
 const RequestBodySchema = z.object({
   messages: z.array(z.unknown()),
+  conversationId: z.string().optional(),
 });
 
 export async function POST(request: Request) {
@@ -49,6 +54,44 @@ export async function POST(request: Request) {
   }
 
   const messages = parsed.data.messages as UIMessage[];
+  const conversationId = parsed.data.conversationId;
+
+  // Resolve the authenticated user (non-fatal — skip persistence if unauthenticated)
+  let userId: number | null = null;
+  try {
+    const user = await getAuthenticatedUser();
+    userId = user.id;
+  } catch {
+    // unauthenticated or not allowlisted — allow the stream but skip DB writes
+  }
+
+  // Persist the last user message and upsert the conversation before streaming
+  if (conversationId && userId !== null) {
+    const lastUserMsg = [...messages].reverse().find((m) => m.role === 'user');
+    if (lastUserMsg) {
+      const titleText =
+        lastUserMsg.parts
+          .filter((p): p is { type: 'text'; text: string } => p.type === 'text')
+          .map((p) => p.text)
+          .join(' ')
+          .slice(0, 60) || null;
+
+      await db
+        .insert(conversation)
+        .values({ id: conversationId, userId, title: titleText })
+        .onConflictDoNothing();
+
+      await db
+        .insert(message)
+        .values({
+          id: lastUserMsg.id,
+          conversationId,
+          role: 'user',
+          parts: lastUserMsg.parts,
+        })
+        .onConflictDoNothing();
+    }
+  }
 
   const model =
     process.env.NEXT_PUBLIC_MOCK_AI === 'true'
@@ -100,5 +143,26 @@ export async function POST(request: Request) {
     },
   });
 
-  return result.toUIMessageStreamResponse();
+  return result.toUIMessageStreamResponse({
+    onFinish: async ({ messages: finalMessages }) => {
+      if (!conversationId || userId === null) return;
+      const assistantMsg = finalMessages.at(-1);
+      if (!assistantMsg || assistantMsg.role !== 'assistant') return;
+
+      await db
+        .insert(message)
+        .values({
+          id: assistantMsg.id,
+          conversationId,
+          role: 'assistant',
+          parts: assistantMsg.parts,
+        })
+        .onConflictDoNothing();
+
+      await db
+        .update(conversation)
+        .set({ updatedAt: new Date() })
+        .where(eq(conversation.id, conversationId));
+    },
+  });
 }

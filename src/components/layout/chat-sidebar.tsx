@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   ChevronsUpDown,
   MessageSquare,
@@ -32,16 +32,30 @@ import {
 } from '@/components/ui/tooltip';
 import { cn } from '@/utils/ui';
 
+type Conversation = {
+  id: string;
+  title: string | null;
+  updatedAt: string;
+};
+
 type NavItemProps = {
   icon: React.ElementType;
   label: string;
   active?: boolean;
   collapsed: boolean;
+  onClick?: () => void;
 };
 
-function NavItem({ icon: Icon, label, active, collapsed }: NavItemProps) {
+function NavItem({
+  icon: Icon,
+  label,
+  active,
+  collapsed,
+  onClick,
+}: NavItemProps) {
   const button = (
     <button
+      onClick={onClick}
       className={cn(
         'flex w-full items-center gap-2.5 rounded-md px-2 py-1.5 text-sm transition-colors',
         active
@@ -173,8 +187,28 @@ function UserFooter({ collapsed }: { collapsed: boolean }) {
   );
 }
 
-export function ChatSidebar() {
+type ChatSidebarProps = {
+  activeConversationId?: string;
+};
+
+export function ChatSidebar({ activeConversationId }: ChatSidebarProps) {
   const [open, setOpen] = useState(true);
+  const [conversations, setConversations] = useState<Conversation[]>([]);
+  const router = useRouter();
+
+  useEffect(() => {
+    fetch('/api/conversations')
+      .then((r) => r.json())
+      .then((data: Conversation[]) => setConversations(data))
+      .catch(() => {});
+  }, [activeConversationId]);
+
+  async function handleNewChat() {
+    const res = await fetch('/api/conversations', { method: 'POST' });
+    if (!res.ok) return;
+    const { id } = (await res.json()) as { id: string };
+    router.push(`/chat/${id}`);
+  }
 
   return (
     <TooltipProvider delayDuration={0}>
@@ -197,14 +231,44 @@ export function ChatSidebar() {
 
         {/* Nav */}
         <div className="flex flex-1 flex-col gap-1 overflow-y-auto p-2">
-          <NavItem icon={Plus} label="New Chat" collapsed={!open} />
           <NavItem
-            icon={MessageSquare}
-            label="Current Chat"
-            active
+            icon={Plus}
+            label="New Chat"
             collapsed={!open}
+            onClick={handleNewChat}
           />
-          {open && (
+
+          {open && conversations.length > 0 && (
+            <div className="mt-3">
+              <p className="text-muted-foreground px-2 py-1 text-xs font-medium">
+                History
+              </p>
+              {conversations.map((conv) => (
+                <Link
+                  key={conv.id}
+                  href={`/chat/${conv.id}`}
+                  className={cn(
+                    'flex w-full items-center gap-2.5 rounded-md px-2 py-1.5 text-sm transition-colors',
+                    conv.id === activeConversationId
+                      ? 'bg-accent text-accent-foreground font-medium'
+                      : 'text-sidebar-foreground hover:bg-muted hover:text-foreground'
+                  )}
+                >
+                  <MessageSquare
+                    className={cn(
+                      'size-4 shrink-0',
+                      conv.id === activeConversationId
+                        ? 'text-accent-foreground'
+                        : 'text-muted-foreground'
+                    )}
+                  />
+                  <span className="truncate">{conv.title ?? 'New Chat'}</span>
+                </Link>
+              ))}
+            </div>
+          )}
+
+          {open && conversations.length === 0 && (
             <div className="mt-3">
               <p className="text-muted-foreground px-2 py-1 text-xs font-medium">
                 History
@@ -216,7 +280,7 @@ export function ChatSidebar() {
           )}
         </div>
 
-        {/* User profile — border-border matches the chat pane's input form border */}
+        {/* User profile */}
         <div className="border-border shrink-0 border-t p-2">
           <UserFooter collapsed={!open} />
         </div>
