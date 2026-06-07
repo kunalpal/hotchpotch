@@ -189,48 +189,42 @@ export default function ChatPage() {
     runtimeManagerRef.current.unmountWidget(panelId);
   }, []);
 
-  // Update callbacks every render so RuntimeManager always calls the latest
-  // closures. All values captured here (setPanels, setActivePanelId,
-  // mountedWidgetIdsRef, injectTurn) are stable React references, so this is
-  // equivalent to a one-time setup in practice but avoids the injectTurnRef
-  // bridge that was previously needed to keep onInjectTurn current.
-  runtimeManagerRef.current.setCallbacks({
-    onInjectTurn: injectTurn,
-    onWidgetFailed: (panelId) =>
-      setPanels((prev) =>
-        prev.map((p) => (p.panelId === panelId ? { ...p, failed: true } : p))
-      ),
-    onRenderWidgetStarted: (panelId) => {
-      setPanels((prev) =>
-        prev.map((p) =>
-          p.panelId === panelId ? { ...p, hasContent: true } : p
-        )
-      );
-      setActivePanelId(panelId);
-    },
-    onPanelUnmounted: (panelId) => {
-      mountedWidgetIdsRef.current.delete(panelId);
-      setPanels((prev) => prev.filter((p) => p.panelId !== panelId));
-    },
-    onBackgroundToolComplete: (panelId) => {
-      setPanels((prev) =>
-        prev.map((p) => (p.panelId === panelId ? { ...p, pulsing: true } : p))
-      );
-      setTimeout(() => {
-        setPanels((prev) =>
-          prev.map((p) =>
-            p.panelId === panelId ? { ...p, pulsing: false } : p
-          )
-        );
-      }, 1000);
-    },
-  });
-
   useEffect(() => {
     const rm = runtimeManagerRef.current;
+    rm.setCallbacks({
+      onInjectTurn: injectTurn,
+      onWidgetFailed: (panelId) =>
+        setPanels((prev) =>
+          prev.map((p) => (p.panelId === panelId ? { ...p, failed: true } : p))
+        ),
+      onRenderWidgetStarted: (panelId) => {
+        setPanels((prev) =>
+          prev.map((p) =>
+            p.panelId === panelId ? { ...p, hasContent: true } : p
+          )
+        );
+        setActivePanelId(panelId);
+      },
+      onPanelUnmounted: (panelId) => {
+        mountedWidgetIdsRef.current.delete(panelId);
+        setPanels((prev) => prev.filter((p) => p.panelId !== panelId));
+      },
+      onBackgroundToolComplete: (panelId) => {
+        setPanels((prev) =>
+          prev.map((p) => (p.panelId === panelId ? { ...p, pulsing: true } : p))
+        );
+        setTimeout(() => {
+          setPanels((prev) =>
+            prev.map((p) =>
+              p.panelId === panelId ? { ...p, pulsing: false } : p
+            )
+          );
+        }, 1000);
+      },
+    });
     rm.start();
     return () => rm.stop();
-  }, []);
+  }, [injectTurn]);
 
   return (
     <div className="flex h-screen w-full overflow-hidden">

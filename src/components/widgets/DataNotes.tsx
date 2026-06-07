@@ -105,7 +105,12 @@ export function DataNotes({ host }: Props) {
     if (!title) return;
     setNotes((prev) => [
       ...prev,
-      { id: String(++noteCounterRef.current), title, body: body ?? '', pinned: false },
+      {
+        id: String(++noteCounterRef.current),
+        title,
+        body: body ?? '',
+        pinned: false,
+      },
     ]);
     if (titleRef.current) titleRef.current.value = '';
     if (bodyRef.current) bodyRef.current.value = '';
