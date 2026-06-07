@@ -73,7 +73,6 @@ export class ToolDispatcher {
 
     host.send(createEnvelope('TOOL_TIMEOUT', { tool_use_id: toolUseId }));
     pending.reject(new Error(`Tool call ${toolUseId} timed out`));
-    this.onBackgroundComplete?.(pending.panelId);
   }
 
   /** Returns the panelId owning a given namespaced tool name, or null */
