@@ -44,7 +44,6 @@ interface PanelEntry {
 
 export default function ChatPage() {
   const runtimeManagerRef = useRef(new RuntimeManager());
-  const injectTurnRef = useRef<((content: string) => void) | null>(null);
 
   // Stable callback-ref functions per panelId — must not be recreated on each render
   // so React doesn't call null/element unnecessarily. This is the React-recommended
@@ -131,10 +130,6 @@ export default function ChatPage() {
     injectTurn,
   } = useConversationManager(runtimeManagerRef, onBeforeSend);
 
-  useEffect(() => {
-    injectTurnRef.current = injectTurn;
-  }, [injectTurn]);
-
   // When the active panel is removed, fall back to the last remaining panel.
   // Derived during render rather than via a setState-in-effect to avoid a
   // cascading render cycle.
@@ -194,32 +189,30 @@ export default function ChatPage() {
     runtimeManagerRef.current.unmountWidget(panelId);
   }, []);
 
-  useEffect(() => {
-    const rm = runtimeManagerRef.current;
-
-    rm.onInjectTurn = (content) => injectTurnRef.current?.(content);
-
-    rm.onWidgetFailed = (panelId) => {
+  // Update callbacks every render so RuntimeManager always calls the latest
+  // closures. All values captured here (setPanels, setActivePanelId,
+  // mountedWidgetIdsRef, injectTurn) are stable React references, so this is
+  // equivalent to a one-time setup in practice but avoids the injectTurnRef
+  // bridge that was previously needed to keep onInjectTurn current.
+  runtimeManagerRef.current.setCallbacks({
+    onInjectTurn: injectTurn,
+    onWidgetFailed: (panelId) =>
       setPanels((prev) =>
         prev.map((p) => (p.panelId === panelId ? { ...p, failed: true } : p))
-      );
-    };
-
-    rm.onRenderWidgetStarted = (panelId) => {
+      ),
+    onRenderWidgetStarted: (panelId) => {
       setPanels((prev) =>
         prev.map((p) =>
           p.panelId === panelId ? { ...p, hasContent: true } : p
         )
       );
       setActivePanelId(panelId);
-    };
-
-    rm.onPanelUnmounted = (panelId) => {
+    },
+    onPanelUnmounted: (panelId) => {
       mountedWidgetIdsRef.current.delete(panelId);
       setPanels((prev) => prev.filter((p) => p.panelId !== panelId));
-    };
-
-    rm.onBackgroundToolComplete = (panelId) => {
+    },
+    onBackgroundToolComplete: (panelId) => {
       setPanels((prev) =>
         prev.map((p) => (p.panelId === panelId ? { ...p, pulsing: true } : p))
       );
@@ -230,8 +223,11 @@ export default function ChatPage() {
           )
         );
       }, 1000);
-    };
+    },
+  });
 
+  useEffect(() => {
+    const rm = runtimeManagerRef.current;
     rm.start();
     return () => rm.stop();
   }, []);

@@ -14,28 +14,41 @@ import { SkillRouter } from '@/lib/runtime/skill-router';
 import { validateAction } from '@/lib/runtime/injection-guard';
 import { renderTemplate } from '@/lib/runtime/template-renderer';
 
+interface RuntimeCallbacks {
+  onWidgetFailed: ((panelId: string) => void) | null;
+  onPanelUnmounted: ((panelId: string) => void) | null;
+  onBackgroundToolComplete: ((panelId: string) => void) | null;
+  onToolRegistryUpdate: ((add: string[], remove: string[]) => void) | null;
+  onInjectTurn: ((content: string) => void) | null;
+  onRenderWidgetStarted: ((panelId: string) => void) | null;
+}
+
 export class RuntimeManager {
   private hosts = new Map<string, WidgetHost>();
   private passiveBuffers = new Map<string, PendingContextBuffer>();
   private messageListener: ((event: MessageEvent) => void) | null = null;
+  private callbacks: RuntimeCallbacks = {
+    onWidgetFailed: null,
+    onPanelUnmounted: null,
+    onBackgroundToolComplete: null,
+    onToolRegistryUpdate: null,
+    onInjectTurn: null,
+    onRenderWidgetStarted: null,
+  };
 
   readonly toolDispatcher = new ToolDispatcher();
   readonly skillRouter = new SkillRouter(this.hosts);
 
-  onWidgetFailed: ((panelId: string) => void) | null = null;
-  onPanelUnmounted: ((panelId: string) => void) | null = null;
-  onBackgroundToolComplete: ((panelId: string) => void) | null = null;
-  onToolRegistryUpdate: ((add: string[], remove: string[]) => void) | null =
-    null;
-  onInjectTurn: ((content: string) => void) | null = null;
-  onRenderWidgetStarted: ((panelId: string) => void) | null = null;
+  setCallbacks(cb: Partial<RuntimeCallbacks>): void {
+    Object.assign(this.callbacks, cb);
+  }
 
   start(): void {
     this.messageListener = this.handleMessage.bind(this);
     window.addEventListener('message', this.messageListener);
 
     this.toolDispatcher.onBackgroundComplete = (panelId) => {
-      this.onBackgroundToolComplete?.(panelId);
+      this.callbacks.onBackgroundToolComplete?.(panelId);
     };
   }
 
@@ -57,7 +70,7 @@ export class RuntimeManager {
 
     host.startReadyTimeout(() => {
       host.status = 'failed';
-      this.onWidgetFailed?.(panelId);
+      this.callbacks.onWidgetFailed?.(panelId);
     });
 
     host.onMessage((envelope) => this.handleInbound(panelId, envelope));
@@ -80,7 +93,7 @@ export class RuntimeManager {
     if (manifest.tools.length > 0) {
       const namespaced = manifest.tools.map((t) => `${panelId}__${t.name}`);
       host.registeredTools = namespaced;
-      this.onToolRegistryUpdate?.(namespaced, []);
+      this.callbacks.onToolRegistryUpdate?.(namespaced, []);
     }
 
     return host;
@@ -93,7 +106,7 @@ export class RuntimeManager {
   ): Promise<void> {
     const host = this.hosts.get(panelId);
     if (!host) return;
-    this.onRenderWidgetStarted?.(panelId);
+    this.callbacks.onRenderWidgetStarted?.(panelId);
 
     // Validate payload against the widget's registered schema
     const schema = WIDGET_PAYLOAD_SCHEMAS[host.manifest.widget_id];
@@ -130,7 +143,7 @@ export class RuntimeManager {
     host.dispose();
     this.hosts.delete(panelId);
     this.passiveBuffers.delete(panelId);
-    this.onPanelUnmounted?.(panelId);
+    this.callbacks.onPanelUnmounted?.(panelId);
   }
 
   getHost(panelId: string): WidgetHost | undefined {
@@ -218,14 +231,14 @@ export class RuntimeManager {
           `[RuntimeManager] Undeclared tool "${tool.name}" from panel ${panelId} — rejecting registration`
         );
         host.status = 'failed';
-        this.onWidgetFailed?.(panelId);
+        this.callbacks.onWidgetFailed?.(panelId);
         return;
       }
     }
 
     const namespaced = tools.map((t) => `${panelId}__${t.name}`);
     host.registeredTools = namespaced;
-    this.onToolRegistryUpdate?.(namespaced, []);
+    this.callbacks.onToolRegistryUpdate?.(namespaced, []);
   }
 
   private handleReady(panelId: string): void {
@@ -261,7 +274,7 @@ export class RuntimeManager {
     }
 
     if (validated.urgency === 'active') {
-      this.onInjectTurn?.(`[Widget] ${rendered}`);
+      this.callbacks.onInjectTurn?.(`[Widget] ${rendered}`);
     } else {
       this.passiveBuffers.get(panelId)?.push(rendered);
     }
