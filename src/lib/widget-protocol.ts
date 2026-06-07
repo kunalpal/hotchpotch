@@ -132,8 +132,22 @@ export type TravelItineraryPayload = z.infer<
   typeof TravelItineraryPayloadSchema
 >;
 
+export const NoteItemSchema = z.object({
+  id: z.string(),
+  title: z.string(),
+  body: z.string().default(''),
+  pinned: z.boolean().default(false),
+});
+
+export const NotesPayloadSchema = z.object({
+  notes: z.array(NoteItemSchema).default([]),
+});
+
+export type NotesPayload = z.infer<typeof NotesPayloadSchema>;
+
 export const WIDGET_PAYLOAD_SCHEMAS: Record<string, z.ZodTypeAny> = {
   'travel.itinerary': TravelItineraryPayloadSchema,
+  'data.notes': NotesPayloadSchema,
 };
 
 // ─── Helper ───────────────────────────────────────────────────────────────────

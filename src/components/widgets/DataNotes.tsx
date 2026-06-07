@@ -1,8 +1,9 @@
 'use client';
 
-import { useId, useLayoutEffect, useRef, useState } from 'react';
+import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
 import { useWidgetHost } from '@/lib/hooks/use-widget-host';
 import { PROTOCOL_VERSION } from '@/lib/widget-protocol';
+import type { NotesPayload } from '@/lib/widget-protocol';
 import type { NativeWidgetHost } from '@/lib/runtime/native-widget-host';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -21,79 +22,82 @@ interface Note {
 }
 
 export function DataNotes({ host }: Props) {
-  const noteCounterRef = useRef(0);
   const [notes, setNotes] = useState<Note[]>([]);
-  // Keep a ref so the SKILL_INVOKE handler can always read the latest notes
   const notesRef = useRef(notes);
-  // Updated outside render (react-hooks/refs)
   useLayoutEffect(() => {
     notesRef.current = notes;
   });
 
-  // Notes doesn't receive a payload from the model — it manages its own state.
-  // The host is also used to receive SKILL_INVOKE for context_injector and intent_interceptor.
-  const { sendAction } = useWidgetHost(host, (envelope) => {
-    if (envelope.type !== 'SKILL_INVOKE') return;
-    const { skill_id, type, query } = envelope.payload as {
-      skill_id: string;
-      type: string;
-      query: unknown;
-    };
+  const { payload, sendAction } = useWidgetHost<NotesPayload>(
+    host,
+    (envelope) => {
+      if (envelope.type !== 'SKILL_INVOKE') return;
+      const { skill_id, type, query } = envelope.payload as {
+        skill_id: string;
+        type: string;
+        query: unknown;
+      };
 
-    if (type === 'context_injector') {
-      const pinnedNotes = notesRef.current.filter((n) => n.pinned);
-      const summary =
-        pinnedNotes.length > 0
-          ? `Pinned notes: ${pinnedNotes.map((n) => `"${n.title}"${n.body ? ` — ${n.body}` : ''}`).join('; ')}`
-          : '';
-      host.receiveFromWidget({
-        protocol: PROTOCOL_VERSION,
-        message_id: crypto.randomUUID(),
-        reply_to: null,
-        type: 'SKILL_RESULT',
-        timestamp: Date.now(),
-        payload: { skill_id, type: 'context_injector', result: summary },
-      });
-    } else if (type === 'intent_interceptor') {
-      const queryText = typeof query === 'string' ? query : '';
-      // Strip common imperative prefixes to extract just the note content
-      const content =
-        queryText
-          .replace(
-            /^(note this|add a note|add note|jot down|write this down|save this|remember this|add to notes)[:\s]*/i,
-            ''
-          )
-          .trim() || queryText.trim();
+      if (type === 'context_injector') {
+        const pinnedNotes = notesRef.current.filter((n) => n.pinned);
+        const summary =
+          pinnedNotes.length > 0
+            ? `Pinned notes: ${pinnedNotes.map((n) => `"${n.title}"${n.body ? ` — ${n.body}` : ''}`).join('; ')}`
+            : '';
+        host.receiveFromWidget({
+          protocol: PROTOCOL_VERSION,
+          message_id: crypto.randomUUID(),
+          reply_to: null,
+          type: 'SKILL_RESULT',
+          timestamp: Date.now(),
+          payload: { skill_id, type: 'context_injector', result: summary },
+        });
+      } else if (type === 'intent_interceptor') {
+        const queryText = typeof query === 'string' ? query : '';
+        const content =
+          queryText
+            .replace(
+              /^(note this|add a note|add note|jot down|write this down|save this|remember this|add to notes)[:\s]*/i,
+              ''
+            )
+            .trim() || queryText.trim();
 
-      const noteTitle = content.slice(0, 80) || 'Note';
-      const noteBody = content.length > 80 ? content.slice(80).trim() : '';
-      setNotes((prev) => [
-        ...prev,
-        {
-          id: String(++noteCounterRef.current),
-          title: noteTitle,
-          body: noteBody,
-          pinned: false,
-        },
-      ]);
-
-      host.receiveFromWidget({
-        protocol: PROTOCOL_VERSION,
-        message_id: crypto.randomUUID(),
-        reply_to: null,
-        type: 'SKILL_RESULT',
-        timestamp: Date.now(),
-        payload: {
-          skill_id,
-          type: 'intent_interceptor',
-          result: {
-            response: `Got it — I've added a note: "${noteTitle}"`,
-            payload: null,
+        const noteTitle = content.slice(0, 80) || 'Note';
+        const noteBody = content.length > 80 ? content.slice(80).trim() : '';
+        setNotes((prev) => [
+          ...prev,
+          {
+            id: crypto.randomUUID(),
+            title: noteTitle,
+            body: noteBody,
+            pinned: false,
           },
-        },
-      });
+        ]);
+
+        host.receiveFromWidget({
+          protocol: PROTOCOL_VERSION,
+          message_id: crypto.randomUUID(),
+          reply_to: null,
+          type: 'SKILL_RESULT',
+          timestamp: Date.now(),
+          payload: {
+            skill_id,
+            type: 'intent_interceptor',
+            result: {
+              response: `Got it — I've added a note: "${noteTitle}"`,
+              payload: null,
+            },
+          },
+        });
+      }
     }
-  });
+  );
+
+  // Seed notes from LLM payload on MOUNT/REPLACE
+  useEffect(() => {
+    if (!payload?.notes) return;
+    setNotes(payload.notes);
+  }, [payload]);
 
   const formId = useId();
   const titleRef = useRef<HTMLInputElement>(null);
@@ -106,7 +110,7 @@ export function DataNotes({ host }: Props) {
     setNotes((prev) => [
       ...prev,
       {
-        id: String(++noteCounterRef.current),
+        id: crypto.randomUUID(),
         title,
         body: body ?? '',
         pinned: false,

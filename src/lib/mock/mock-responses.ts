@@ -29,6 +29,17 @@ const JAPAN_ITINERARY = {
   ],
 };
 
+const INITIAL_NOTES = {
+  notes: [
+    {
+      id: 'note-1',
+      title: 'Getting started',
+      body: 'Pin a note to include it as context in your next message.',
+      pinned: false,
+    },
+  ],
+};
+
 const EUROPE_ITINERARY = {
   days: [
     {
@@ -190,10 +201,7 @@ export function buildMockChunks(
           't1',
           '[MOCK] The Notes widget is open — jot things down anytime.'
         ),
-        // render_widget with an empty payload so the mount is persisted and
-        // can be replayed on reload. DataNotes ignores the MOUNT envelope and
-        // manages its own state internally.
-        renderWidget('tc1', 'data.notes', {}),
+        renderWidget('tc1', 'data.notes', INITIAL_NOTES),
         finishChunk(true),
       ];
     default:

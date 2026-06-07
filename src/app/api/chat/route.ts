@@ -103,7 +103,8 @@ export async function POST(request: Request) {
     system:
       'You are HotchPotch, an AI assistant with access to interactive widgets.\n' +
       'When the user asks about travel planning, trips, or itineraries, call render_widget with widget_id "travel.itinerary" and a fully populated payload.\n' +
-      'Always include specific dates, locations, and concrete activities — never use placeholders.',
+      'When the user asks to take notes or remember something, call render_widget with widget_id "data.notes" and a payload of the form { notes: [{ id, title, body, pinned }] }. Pre-populate notes relevant to the user\'s request.\n' +
+      'Always include specific, concrete content — never use placeholders.',
     messages: await convertToModelMessages(messages),
     tools: {
       render_widget: tool({
