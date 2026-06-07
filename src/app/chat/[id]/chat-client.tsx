@@ -176,6 +176,44 @@ export function ChatClient({
     runtimeManagerRef.current.unmountWidget(panelId);
   }, []);
 
+  // Replay render_widget calls from history loaded at page load.
+  // onToolCall only fires for live stream events, not for initialMessages.
+  useEffect(() => {
+    if (!initialMessages.length) return;
+
+    const widgetRenders = new Map<
+      string,
+      { payload: unknown; updateStrategy: 'mount' | 'replace' }
+    >();
+
+    for (const msg of initialMessages) {
+      if (msg.role !== 'assistant') continue;
+      for (const part of msg.parts) {
+        if (part.type === 'tool-render_widget' && 'input' in part) {
+          const { widget_id, payload, update_strategy } = part.input as {
+            widget_id: string;
+            payload: unknown;
+            update_strategy?: 'mount' | 'replace';
+          };
+          widgetRenders.set(widget_id, {
+            payload,
+            updateStrategy: update_strategy ?? 'mount',
+          });
+        }
+      }
+    }
+
+    for (const [widgetId, { payload, updateStrategy }] of widgetRenders) {
+      void runtimeManagerRef.current.onRenderWidget(widgetId, payload, updateStrategy);
+      if (NATIVE_MANIFESTS[widgetId]) {
+        mountNativePanel(widgetId);
+      } else {
+        void mountIframePanel(widgetId);
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   useEffect(() => {
     const rm = runtimeManagerRef.current;
     rm.setCallbacks({

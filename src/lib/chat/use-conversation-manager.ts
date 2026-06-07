@@ -4,11 +4,12 @@ import {
   type MutableRefObject,
   useCallback,
   useEffect,
+  useMemo,
   useRef,
   useState,
 } from 'react';
 import { useChat } from '@ai-sdk/react';
-import { generateId } from 'ai';
+import { DefaultChatTransport, generateId } from 'ai';
 import type { UIMessage } from 'ai';
 import type { RuntimeManager } from '@/lib/runtime/runtime-manager';
 import { ToolDispatcher } from '@/lib/runtime/tool-dispatcher';
@@ -34,11 +35,21 @@ export function useConversationManager(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const addToolResultRef = useRef<((params: any) => void) | null>(null);
 
+  const transport = useMemo(
+    () =>
+      new DefaultChatTransport({
+        ...(options?.conversationId && {
+          body: { conversationId: options.conversationId },
+        }),
+      }),
+    // conversationId is stable for the lifetime of a conversation (ChatClient remounts on change)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    []
+  );
+
   const { messages, sendMessage, status, addToolResult, setMessages } = useChat(
     {
-      ...(options?.conversationId && {
-        body: { conversationId: options.conversationId },
-      }),
+      transport,
       ...(options?.initialMessages && { messages: options.initialMessages }),
       onToolCall({ toolCall }) {
         if (toolCall.toolName === 'render_widget') {

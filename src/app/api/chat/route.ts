@@ -144,20 +144,22 @@ export async function POST(request: Request) {
   });
 
   return result.toUIMessageStreamResponse({
-    onFinish: async ({ messages: finalMessages }) => {
+    generateMessageId: () => crypto.randomUUID(),
+    onFinish: async ({ responseMessage }) => {
       if (!conversationId || userId === null) return;
-      const assistantMsg = finalMessages.at(-1);
-      if (!assistantMsg || assistantMsg.role !== 'assistant') return;
 
       await db
         .insert(message)
         .values({
-          id: assistantMsg.id,
+          id: responseMessage.id,
           conversationId,
-          role: 'assistant',
-          parts: assistantMsg.parts,
+          role: responseMessage.role,
+          parts: responseMessage.parts,
         })
-        .onConflictDoNothing();
+        .onConflictDoUpdate({
+          target: message.id,
+          set: { parts: responseMessage.parts },
+        });
 
       await db
         .update(conversation)
