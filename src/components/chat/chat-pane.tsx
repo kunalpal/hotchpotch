@@ -86,49 +86,51 @@ export function ChatPane({
 
       <form
         onSubmit={handleSubmit}
-        className="border-border flex shrink-0 items-end gap-2 border-t p-3"
+        className="border-border bg-card shrink-0 border-t p-3"
       >
-        <Textarea
-          value={input}
-          onChange={handleInputChange}
-          placeholder="Ask anything…"
-          rows={1}
-          className="flex-1 resize-none"
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' && !e.shiftKey) {
-              e.preventDefault();
-              e.currentTarget.form?.requestSubmit();
-            }
-          }}
-        />
-        {IS_MOCK_MODE ? (
-          <ButtonGroup>
+        <div className="mx-auto flex w-full max-w-4xl items-end gap-2">
+          <Textarea
+            value={input}
+            onChange={handleInputChange}
+            placeholder="Ask anything…"
+            rows={1}
+            className="flex-1 resize-none"
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                e.currentTarget.form?.requestSubmit();
+              }
+            }}
+          />
+          {IS_MOCK_MODE ? (
+            <ButtonGroup>
+              <Button type="submit" disabled={isLoading || !input.trim()}>
+                Send
+              </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button type="button" disabled={isLoading} className="px-2">
+                    <ChevronDown className="h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  {MOCK_TRIGGER_OPTIONS.map(({ trigger, label, message }) => (
+                    <DropdownMenuItem
+                      key={trigger}
+                      onClick={() => sendDirectMessage(message)}
+                    >
+                      {label}
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </ButtonGroup>
+          ) : (
             <Button type="submit" disabled={isLoading || !input.trim()}>
               Send
             </Button>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button type="button" disabled={isLoading} className="px-2">
-                  <ChevronDown className="h-4 w-4" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                {MOCK_TRIGGER_OPTIONS.map(({ trigger, label, message }) => (
-                  <DropdownMenuItem
-                    key={trigger}
-                    onClick={() => sendDirectMessage(message)}
-                  >
-                    {label}
-                  </DropdownMenuItem>
-                ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </ButtonGroup>
-        ) : (
-          <Button type="submit" disabled={isLoading || !input.trim()}>
-            Send
-          </Button>
-        )}
+          )}
+        </div>
       </form>
     </div>
   );

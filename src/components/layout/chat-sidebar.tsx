@@ -180,7 +180,7 @@ export function ChatSidebar() {
     <TooltipProvider delayDuration={0}>
       <aside
         className={cn(
-          'bg-sidebar border-border flex h-full shrink-0 flex-col overflow-hidden border-r transition-[width] duration-200 ease-linear',
+          'bg-card border-border flex h-full shrink-0 flex-col overflow-hidden border-r transition-[width] duration-200 ease-linear',
           open ? 'w-56' : 'w-12'
         )}
       >
