@@ -78,7 +78,10 @@ export class ToolDispatcher {
 
     this.pending.delete(toolUseId);
 
-    this.sendFn(host, createEnvelope('TOOL_TIMEOUT', { tool_use_id: toolUseId }));
+    this.sendFn(
+      host,
+      createEnvelope('TOOL_TIMEOUT', { tool_use_id: toolUseId })
+    );
     pending.reject(new Error(`Tool call ${toolUseId} timed out`));
   }
 

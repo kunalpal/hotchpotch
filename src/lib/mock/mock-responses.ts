@@ -51,7 +51,12 @@ const EUROPE_ITINERARY = {
 
 // === Trigger detection ===
 
-export type MockTrigger = 'travel-itinerary' | 'travel-map' | 'budget' | 'notes' | 'default';
+export type MockTrigger =
+  | 'travel-itinerary'
+  | 'travel-map'
+  | 'budget'
+  | 'notes'
+  | 'default';
 
 // Order matters: more specific patterns first
 const TRIGGER_PATTERNS: Array<{ trigger: MockTrigger; pattern: RegExp }> = [

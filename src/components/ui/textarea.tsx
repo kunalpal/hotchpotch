@@ -27,7 +27,7 @@ const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(
     return (
       <ScrollArea
         className={cn(
-          'border-input bg-background focus-within:border-muted-foreground h-24 w-full cursor-text rounded-md border transition-all focus-within:ring-0 focus-within:ring-offset-0',
+          'border-input bg-background focus-within:border-muted-foreground w-full cursor-text rounded-md border transition-all focus-within:ring-0 focus-within:ring-offset-0',
           props.disabled && 'cursor-not-allowed opacity-50',
           className
         )}
