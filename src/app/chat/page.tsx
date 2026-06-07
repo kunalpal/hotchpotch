@@ -219,6 +219,7 @@ export default function ChatPage() {
     };
 
     rm.onPanelUnmounted = (panelId) => {
+      mountedWidgetIdsRef.current.delete(panelId);
       setPanels((prev) => prev.filter((p) => p.panelId !== panelId));
     };
 
