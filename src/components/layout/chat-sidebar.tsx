@@ -1,9 +1,11 @@
 'use client';
 
+import { useState } from 'react';
 import {
   ChevronsUpDown,
   MessageSquare,
   Moon,
+  PanelLeft,
   Plus,
   Sun,
   Unplug,
@@ -23,20 +25,47 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import {
-  Sidebar,
-  SidebarContent,
-  SidebarFooter,
-  SidebarGroup,
-  SidebarGroupContent,
-  SidebarGroupLabel,
-  SidebarHeader,
-  SidebarMenu,
-  SidebarMenuButton,
-  SidebarMenuItem,
-  SidebarTrigger,
-} from '@/components/ui/sidebar';
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
+import { cn } from '@/utils/ui';
 
-function SidebarUserFooter() {
+type NavItemProps = {
+  icon: React.ElementType;
+  label: string;
+  active?: boolean;
+  collapsed: boolean;
+};
+
+function NavItem({ icon: Icon, label, active, collapsed }: NavItemProps) {
+  const button = (
+    <button
+      className={cn(
+        'flex w-full items-center gap-2.5 rounded-md px-2 py-1.5 text-sm transition-colors',
+        active
+          ? 'bg-sidebar-accent text-sidebar-accent-foreground'
+          : 'text-sidebar-foreground hover:bg-sidebar-accent/50'
+      )}
+    >
+      <Icon className="size-4 shrink-0" />
+      {!collapsed && <span className="truncate">{label}</span>}
+    </button>
+  );
+
+  if (collapsed) {
+    return (
+      <Tooltip>
+        <TooltipTrigger asChild>{button}</TooltipTrigger>
+        <TooltipContent side="right">{label}</TooltipContent>
+      </Tooltip>
+    );
+  }
+  return button;
+}
+
+function UserFooter({ collapsed }: { collapsed: boolean }) {
   const session = authClient.useSession();
   const router = useRouter();
   const { data: profileImageUrl } = useProfileImage({});
@@ -53,120 +82,140 @@ function SidebarUserFooter() {
     return name ? name.slice(0, 2).toUpperCase() : '?';
   };
 
+  const avatarEl = (
+    <Avatar className="size-6 shrink-0 rounded-md">
+      <AvatarImage src={avatarUrl} alt={displayName} />
+      <AvatarFallback className="rounded-md text-xs font-medium">
+        {getInitials()}
+      </AvatarFallback>
+    </Avatar>
+  );
+
   return (
-    <SidebarMenu>
-      <SidebarMenuItem>
-        <DropdownMenu>
+    <DropdownMenu>
+      {collapsed ? (
+        <Tooltip>
           <DropdownMenuTrigger asChild>
-            <SidebarMenuButton
-              size="lg"
-              tooltip={displayName}
-              className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
-            >
-              <Avatar className="h-7 w-7 shrink-0 rounded-lg">
-                <AvatarImage src={avatarUrl} alt={displayName} />
-                <AvatarFallback className="rounded-lg text-xs font-medium">
-                  {getInitials()}
-                </AvatarFallback>
-              </Avatar>
-              <div className="grid flex-1 text-left text-sm leading-tight">
-                <span className="truncate font-semibold">{displayName}</span>
-                <span className="text-muted-foreground truncate text-xs">
-                  {user?.email}
-                </span>
-              </div>
-              <ChevronsUpDown className="ml-auto size-4 shrink-0" />
-            </SidebarMenuButton>
+            <TooltipTrigger asChild>
+              <button className="hover:bg-sidebar-accent/50 flex w-full items-center justify-center rounded-md px-2 py-1.5 transition-colors">
+                {avatarEl}
+              </button>
+            </TooltipTrigger>
           </DropdownMenuTrigger>
-          <DropdownMenuContent
-            side="top"
-            align="start"
-            className="bg-card w-52 space-y-1"
-            sideOffset={8}
-          >
-            <div className="flex flex-col space-y-1 p-2">
-              <p className="text-sm leading-none font-medium">{displayName}</p>
-              <p className="text-muted-foreground text-xs leading-none">
+          <TooltipContent side="right">{displayName}</TooltipContent>
+        </Tooltip>
+      ) : (
+        <DropdownMenuTrigger asChild>
+          <button className="hover:bg-sidebar-accent/50 flex w-full items-center gap-2.5 rounded-md px-2 py-1.5 transition-colors">
+            {avatarEl}
+            <div className="grid flex-1 text-left text-sm leading-tight">
+              <span className="text-sidebar-foreground truncate font-semibold">
+                {displayName}
+              </span>
+              <span className="text-muted-foreground truncate text-xs">
                 {user?.email}
-              </p>
+              </span>
             </div>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem variant="accent" asChild>
-              <Link
-                href="/profile"
-                className="flex w-full cursor-pointer items-center"
-              >
-                <User className="h-4 w-4" />
-                <span>Profile</span>
-              </Link>
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              className="cursor-pointer"
-              onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-            >
-              <Sun className="h-4 w-4 dark:hidden" />
-              <Moon className="hidden h-4 w-4 dark:block" />
-              <span>{theme === 'dark' ? 'Light mode' : 'Dark mode'}</span>
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem
-              variant="destructive"
-              className="cursor-pointer"
-              onClick={async () => {
-                await authClient.signOut();
-                router.push('/');
-              }}
-            >
-              <Unplug className="h-4 w-4" />
-              <span>Sign out</span>
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </SidebarMenuItem>
-    </SidebarMenu>
+            <ChevronsUpDown className="text-muted-foreground ml-auto size-3.5 shrink-0" />
+          </button>
+        </DropdownMenuTrigger>
+      )}
+
+      <DropdownMenuContent
+        side="top"
+        align="start"
+        className="bg-card w-52 space-y-1"
+        sideOffset={8}
+      >
+        <div className="flex flex-col space-y-1 p-2">
+          <p className="text-sm leading-none font-medium">{displayName}</p>
+          <p className="text-muted-foreground text-xs leading-none">
+            {user?.email}
+          </p>
+        </div>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem variant="accent" asChild>
+          <Link
+            href="/profile"
+            className="flex w-full cursor-pointer items-center"
+          >
+            <User className="h-4 w-4" />
+            <span>Profile</span>
+          </Link>
+        </DropdownMenuItem>
+        <DropdownMenuItem
+          className="cursor-pointer"
+          onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+        >
+          <Sun className="h-4 w-4 dark:hidden" />
+          <Moon className="hidden h-4 w-4 dark:block" />
+          <span>{theme === 'dark' ? 'Light mode' : 'Dark mode'}</span>
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem
+          variant="destructive"
+          className="cursor-pointer"
+          onClick={async () => {
+            await authClient.signOut();
+            router.push('/');
+          }}
+        >
+          <Unplug className="h-4 w-4" />
+          <span>Sign out</span>
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 
 export function ChatSidebar() {
+  const [open, setOpen] = useState(true);
+
   return (
-    <Sidebar collapsible="icon">
-      <SidebarHeader>
-        <SidebarTrigger className="-ml-1" />
-      </SidebarHeader>
+    <TooltipProvider delayDuration={0}>
+      <aside
+        className={cn(
+          'bg-sidebar flex h-full shrink-0 flex-col overflow-hidden border-r transition-[width] duration-200 ease-linear',
+          open ? 'w-56' : 'w-12'
+        )}
+      >
+        {/* Toggle */}
+        <div className="flex h-12 shrink-0 items-center border-b px-2">
+          <button
+            onClick={() => setOpen((v) => !v)}
+            title={open ? 'Collapse sidebar' : 'Expand sidebar'}
+            className="text-sidebar-foreground hover:bg-sidebar-accent/50 flex size-7 items-center justify-center rounded-md transition-colors"
+          >
+            <PanelLeft className="size-4" />
+          </button>
+        </div>
 
-      <SidebarContent>
-        <SidebarGroup>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              <SidebarMenuItem>
-                <SidebarMenuButton tooltip="New Chat">
-                  <Plus />
-                  <span>New Chat</span>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-              <SidebarMenuItem>
-                <SidebarMenuButton isActive tooltip="Current Chat">
-                  <MessageSquare />
-                  <span>Current Chat</span>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
+        {/* Nav */}
+        <div className="flex flex-1 flex-col gap-1 overflow-y-auto p-2">
+          <NavItem icon={Plus} label="New Chat" collapsed={!open} />
+          <NavItem
+            icon={MessageSquare}
+            label="Current Chat"
+            active
+            collapsed={!open}
+          />
+          {open && (
+            <div className="mt-3">
+              <p className="text-sidebar-foreground/50 px-2 py-1 text-xs font-medium">
+                History
+              </p>
+              <p className="text-sidebar-foreground/40 px-2 py-1 text-xs">
+                No previous conversations
+              </p>
+            </div>
+          )}
+        </div>
 
-        <SidebarGroup className="group-data-[collapsible=icon]:hidden">
-          <SidebarGroupLabel>History</SidebarGroupLabel>
-          <SidebarGroupContent>
-            <p className="text-sidebar-foreground/50 px-2 py-1 text-xs">
-              No previous conversations
-            </p>
-          </SidebarGroupContent>
-        </SidebarGroup>
-      </SidebarContent>
-
-      <SidebarFooter>
-        <SidebarUserFooter />
-      </SidebarFooter>
-    </Sidebar>
+        {/* User profile */}
+        <div className="shrink-0 border-t p-2">
+          <UserFooter collapsed={!open} />
+        </div>
+      </aside>
+    </TooltipProvider>
   );
 }
