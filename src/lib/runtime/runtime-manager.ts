@@ -22,7 +22,6 @@ export class RuntimeManager {
   readonly toolDispatcher = new ToolDispatcher();
   readonly skillRouter = new SkillRouter(this.hosts);
 
-  onWidgetReady: ((panelId: string) => void) | null = null;
   onWidgetFailed: ((panelId: string) => void) | null = null;
   onPanelUnmounted: ((panelId: string) => void) | null = null;
   onBackgroundToolComplete: ((panelId: string) => void) | null = null;
@@ -237,7 +236,6 @@ export class RuntimeManager {
       host.clearReadyTimeout();
     }
     host.status = 'ready';
-    this.onWidgetReady?.(panelId);
 
     for (const envelope of host.pendingOutbound) {
       host.send(envelope);

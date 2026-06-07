@@ -46,8 +46,6 @@ export default function ChatPage() {
   const runtimeManagerRef = useRef(new RuntimeManager());
   const injectTurnRef = useRef<((content: string) => void) | null>(null);
 
-  // Iframe DOM elements keyed by panelId
-  const iframeRefs = useRef(new Map<string, HTMLIFrameElement>());
   // Stable callback-ref functions per panelId — must not be recreated on each render
   // so React doesn't call null/element unnecessarily. This is the React-recommended
   // pattern for dynamic ref lists (https://react.dev/learn/manipulating-the-dom-with-refs).
@@ -166,7 +164,6 @@ export default function ChatPage() {
         panelId,
         (el: HTMLIFrameElement | null) => {
           if (el) {
-            iframeRefs.current.set(panelId, el);
             const pending = pendingMountsRef.current.get(panelId);
             if (pending) {
               pendingMountsRef.current.delete(panelId);
@@ -185,7 +182,6 @@ export default function ChatPage() {
               );
             }
           } else {
-            iframeRefs.current.delete(panelId);
             iframeRefCallbacks.current.delete(panelId);
           }
         }
