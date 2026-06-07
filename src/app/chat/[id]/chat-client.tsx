@@ -204,10 +204,15 @@ export function ChatClient({
     }
 
     for (const [widgetId, { payload, updateStrategy }] of widgetRenders) {
-      void runtimeManagerRef.current.onRenderWidget(widgetId, payload, updateStrategy);
+      void runtimeManagerRef.current.onRenderWidget(
+        widgetId,
+        payload,
+        updateStrategy
+      );
       if (NATIVE_MANIFESTS[widgetId]) {
         mountNativePanel(widgetId);
       } else {
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         void mountIframePanel(widgetId);
       }
     }

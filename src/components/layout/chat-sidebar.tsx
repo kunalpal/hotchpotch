@@ -5,6 +5,7 @@ import {
   ChevronsUpDown,
   MessageSquare,
   Moon,
+  MoreHorizontal,
   PanelLeft,
   Plus,
   Sun,
@@ -30,6 +31,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
+import { ConversationEditDialog } from '@/components/layout/conversation-edit-dialog';
 import { cn } from '@/utils/ui';
 
 type Conversation = {
@@ -187,6 +189,67 @@ function UserFooter({ collapsed }: { collapsed: boolean }) {
   );
 }
 
+type ConversationItemProps = {
+  conv: Conversation;
+  isActive: boolean;
+  onRename: (id: string, title: string) => void;
+  onDelete: (id: string) => void;
+};
+
+function ConversationItem({
+  conv,
+  isActive,
+  onRename,
+  onDelete,
+}: ConversationItemProps) {
+  const [dialogOpen, setDialogOpen] = useState(false);
+
+  return (
+    <>
+      <div
+        className={cn(
+          'group flex w-full items-center gap-2.5 rounded-md px-2 py-1.5 text-sm transition-colors',
+          isActive
+            ? 'bg-accent text-accent-foreground font-medium'
+            : 'text-sidebar-foreground hover:bg-muted hover:text-foreground'
+        )}
+      >
+        <Link
+          href={`/chat/${conv.id}`}
+          className="flex min-w-0 flex-1 items-center gap-2.5"
+        >
+          <MessageSquare
+            className={cn(
+              'size-3.5 shrink-0',
+              isActive ? 'text-accent-foreground' : 'text-muted-foreground'
+            )}
+          />
+          <span className="truncate">{conv.title ?? 'New Chat'}</span>
+        </Link>
+
+        <button
+          onClick={() => setDialogOpen(true)}
+          className={cn(
+            'text-muted-foreground hover:text-foreground flex size-5 shrink-0 items-center justify-center rounded transition-opacity',
+            dialogOpen ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
+          )}
+        >
+          <MoreHorizontal className="size-3.5" />
+        </button>
+      </div>
+
+      <ConversationEditDialog
+        open={dialogOpen}
+        onOpenChange={setDialogOpen}
+        conversationId={conv.id}
+        currentTitle={conv.title}
+        onRename={(title) => onRename(conv.id, title)}
+        onDelete={() => onDelete(conv.id)}
+      />
+    </>
+  );
+}
+
 type ChatSidebarProps = {
   activeConversationId?: string;
 };
@@ -208,6 +271,17 @@ export function ChatSidebar({ activeConversationId }: ChatSidebarProps) {
     if (!res.ok) return;
     const { id } = (await res.json()) as { id: string };
     router.push(`/chat/${id}`);
+  }
+
+  function handleRename(id: string, title: string) {
+    setConversations((prev) =>
+      prev.map((c) => (c.id === id ? { ...c, title } : c))
+    );
+  }
+
+  function handleDelete(id: string) {
+    setConversations((prev) => prev.filter((c) => c.id !== id));
+    if (id === activeConversationId) router.push('/chat');
   }
 
   return (
@@ -244,26 +318,13 @@ export function ChatSidebar({ activeConversationId }: ChatSidebarProps) {
                 History
               </p>
               {conversations.map((conv) => (
-                <Link
+                <ConversationItem
                   key={conv.id}
-                  href={`/chat/${conv.id}`}
-                  className={cn(
-                    'flex w-full items-center gap-2.5 rounded-md px-2 py-1.5 text-sm transition-colors',
-                    conv.id === activeConversationId
-                      ? 'bg-accent text-accent-foreground font-medium'
-                      : 'text-sidebar-foreground hover:bg-muted hover:text-foreground'
-                  )}
-                >
-                  <MessageSquare
-                    className={cn(
-                      'size-4 shrink-0',
-                      conv.id === activeConversationId
-                        ? 'text-accent-foreground'
-                        : 'text-muted-foreground'
-                    )}
-                  />
-                  <span className="truncate">{conv.title ?? 'New Chat'}</span>
-                </Link>
+                  conv={conv}
+                  isActive={conv.id === activeConversationId}
+                  onRename={handleRename}
+                  onDelete={handleDelete}
+                />
               ))}
             </div>
           )}
