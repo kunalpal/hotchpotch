@@ -115,9 +115,12 @@ export class RuntimeManager {
     panelId: string,
     manifest: WidgetManifest
   ): NativeWidgetHost {
+    const pending = this.pendingRenders.get(panelId);
     this.bus.lifecycle('native-host-registered', panelId, {
       widgetId: manifest.widget_id,
       toolCount: manifest.tools.length,
+      hasPendingRenders: !!pending,
+      pendingCount: pending?.length ?? 0,
     });
 
     const host = new NativeWidgetHost(panelId, manifest);
@@ -132,6 +135,16 @@ export class RuntimeManager {
       const namespaced = manifest.tools.map((t) => `${panelId}__${t.name}`);
       host.registeredTools = namespaced;
       this.callbacks.onToolRegistryUpdate?.(namespaced, []);
+    }
+
+    if (pending) {
+      this.pendingRenders.delete(panelId);
+      this.bus.lifecycle('pending-render-flushed', panelId, {
+        count: pending.length,
+      });
+      for (const { payload, updateStrategy } of pending) {
+        void this.onRenderWidget(panelId, payload, updateStrategy);
+      }
     }
 
     return host;
