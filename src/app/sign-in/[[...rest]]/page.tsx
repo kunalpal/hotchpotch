@@ -78,7 +78,7 @@ export default function SignInPage() {
             </p>
           </div>
           <div className="flex justify-center">
-            <div className="bg-primary mb-6 h-[3px] w-4 rounded-full" />
+            <div className="bg-primary mb-6 h-0.75 w-4 rounded-full" />
           </div>
           <div className="flex flex-col items-center space-y-3">
             {/* Google sign-in button */}
