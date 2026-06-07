@@ -45,11 +45,16 @@ function NavItem({ icon: Icon, label, active, collapsed }: NavItemProps) {
       className={cn(
         'flex w-full items-center gap-2.5 rounded-md px-2 py-1.5 text-sm transition-colors',
         active
-          ? 'bg-sidebar-accent text-sidebar-accent-foreground'
-          : 'text-sidebar-foreground hover:bg-sidebar-accent/50'
+          ? 'bg-accent text-accent-foreground font-medium'
+          : 'text-sidebar-foreground hover:bg-muted hover:text-foreground'
       )}
     >
-      <Icon className="size-4 shrink-0" />
+      <Icon
+        className={cn(
+          'size-4 shrink-0',
+          active ? 'text-accent-foreground' : 'text-muted-foreground'
+        )}
+      />
       {!collapsed && <span className="truncate">{label}</span>}
     </button>
   );
@@ -85,7 +90,7 @@ function UserFooter({ collapsed }: { collapsed: boolean }) {
   const avatarEl = (
     <Avatar className="size-6 shrink-0 rounded-md">
       <AvatarImage src={avatarUrl} alt={displayName} />
-      <AvatarFallback className="rounded-md text-xs font-medium">
+      <AvatarFallback className="bg-muted text-muted-foreground rounded-md text-xs font-medium">
         {getInitials()}
       </AvatarFallback>
     </Avatar>
@@ -97,7 +102,7 @@ function UserFooter({ collapsed }: { collapsed: boolean }) {
         <Tooltip>
           <DropdownMenuTrigger asChild>
             <TooltipTrigger asChild>
-              <button className="hover:bg-sidebar-accent/50 flex w-full items-center justify-center rounded-md px-2 py-1.5 transition-colors">
+              <button className="hover:bg-muted flex w-full items-center justify-center rounded-md px-2 py-1.5 transition-colors">
                 {avatarEl}
               </button>
             </TooltipTrigger>
@@ -106,10 +111,10 @@ function UserFooter({ collapsed }: { collapsed: boolean }) {
         </Tooltip>
       ) : (
         <DropdownMenuTrigger asChild>
-          <button className="hover:bg-sidebar-accent/50 flex w-full items-center gap-2.5 rounded-md px-2 py-1.5 transition-colors">
+          <button className="hover:bg-muted flex w-full items-center gap-2.5 rounded-md px-2 py-1.5 transition-colors">
             {avatarEl}
-            <div className="grid flex-1 text-left text-sm leading-tight">
-              <span className="text-sidebar-foreground truncate font-semibold">
+            <div className="grid flex-1 text-left leading-tight">
+              <span className="text-foreground truncate text-sm font-medium">
                 {displayName}
               </span>
               <span className="text-muted-foreground truncate text-xs">
@@ -175,16 +180,16 @@ export function ChatSidebar() {
     <TooltipProvider delayDuration={0}>
       <aside
         className={cn(
-          'bg-sidebar flex h-full shrink-0 flex-col overflow-hidden border-r transition-[width] duration-200 ease-linear',
+          'bg-sidebar border-border flex h-full shrink-0 flex-col overflow-hidden border-r transition-[width] duration-200 ease-linear',
           open ? 'w-56' : 'w-12'
         )}
       >
         {/* Toggle */}
-        <div className="flex h-12 shrink-0 items-center border-b px-2">
+        <div className="border-border flex h-12 shrink-0 items-center border-b px-2">
           <button
             onClick={() => setOpen((v) => !v)}
             title={open ? 'Collapse sidebar' : 'Expand sidebar'}
-            className="text-sidebar-foreground hover:bg-sidebar-accent/50 flex size-7 items-center justify-center rounded-md transition-colors"
+            className="text-muted-foreground hover:bg-muted hover:text-foreground flex size-7 items-center justify-center rounded-md transition-colors"
           >
             <PanelLeft className="size-4" />
           </button>
@@ -201,18 +206,18 @@ export function ChatSidebar() {
           />
           {open && (
             <div className="mt-3">
-              <p className="text-sidebar-foreground/50 px-2 py-1 text-xs font-medium">
+              <p className="text-muted-foreground px-2 py-1 text-xs font-medium">
                 History
               </p>
-              <p className="text-sidebar-foreground/40 px-2 py-1 text-xs">
+              <p className="text-muted-foreground px-2 py-1 text-xs">
                 No previous conversations
               </p>
             </div>
           )}
         </div>
 
-        {/* User profile */}
-        <div className="shrink-0 border-t p-2">
+        {/* User profile — border-border matches the chat pane's input form border */}
+        <div className="border-border shrink-0 border-t p-2">
           <UserFooter collapsed={!open} />
         </div>
       </aside>
