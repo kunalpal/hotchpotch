@@ -297,7 +297,7 @@ export default function ChatPage() {
               <li
                 key={message.id}
                 className={cn(
-                  'max-w-[80%] rounded-lg px-3 py-2 text-sm break-words whitespace-pre-wrap',
+                  'max-w-[80%] rounded-lg px-3 py-2 text-sm wrap-break-word whitespace-pre-wrap',
                   message.role === 'user'
                     ? 'bg-primary text-primary-foreground self-end'
                     : 'bg-muted text-foreground self-start'
@@ -350,7 +350,6 @@ export default function ChatPage() {
                       <DropdownMenuItem
                         key={trigger}
                         onClick={() => {
-                          panels.forEach((p) => closePanel(p.panelId));
                           sendDirectMessage(message);
                         }}
                       >

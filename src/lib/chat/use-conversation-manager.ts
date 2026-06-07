@@ -43,6 +43,10 @@ export function useConversationManager(
             payload,
             update_strategy ?? 'mount'
           );
+          addToolResultRef.current?.({
+            toolCallId: toolCall.toolCallId,
+            output: 'rendered',
+          });
           return;
         }
 
