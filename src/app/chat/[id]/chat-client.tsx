@@ -36,7 +36,6 @@ export function ChatClient({
 
   const [panels, setPanels] = useState<PanelEntry[]>([]);
   const [activePanelId, setActivePanelId] = useState<string | null>(null);
-  const [splitMode, setSplitMode] = useState(false);
 
   const mountIframePanel = useCallback(async (widgetId: string) => {
     if (mountedWidgetIdsRef.current.has(widgetId)) return;
@@ -279,8 +278,6 @@ export function ChatClient({
                 panels={panels}
                 activePanelId={activePanelId}
                 setActivePanelId={setActivePanelId}
-                splitMode={splitMode}
-                setSplitMode={setSplitMode}
                 closePanel={closePanel}
                 getIframeRefCallback={getIframeRefCallback}
               />
