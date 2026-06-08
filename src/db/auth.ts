@@ -59,21 +59,5 @@ export const verification = pgTable('auth.verification', {
   updatedAt: timestamp('updated_at'),
 });
 
-export const passkey = pgTable('auth.passkey', {
-  id: text('id').primaryKey().notNull(),
-  name: text('name'),
-  publicKey: text('public_key').notNull(),
-  userId: integer('user_id')
-    .notNull()
-    .references(() => user.id),
-  credentialID: text('credential_id').notNull().unique(),
-  counter: integer('counter').notNull(),
-  deviceType: text('device_type').notNull(),
-  backedUp: boolean('backed_up').notNull(),
-  transports: text('transports'),
-  aaguid: text('aaguid'),
-  createdAt: timestamp('created_at').defaultNow(),
-});
-
 // Alias for consistency with better-auth adapter expectations
 export const users = user;

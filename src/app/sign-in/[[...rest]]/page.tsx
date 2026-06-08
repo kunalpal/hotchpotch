@@ -1,37 +1,16 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useRouter } from '@bprogress/next/app';
-import { Fingerprint } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Logo } from '@/components/ui/logo';
 import { Spinner } from '@/components/ui/shadcn-io/spinner';
 import { ModeToggle } from '@/components/theme-switcher';
 import { authClient } from '@/lib/auth-client';
-import { toast } from 'sonner';
 
 export default function SignInPage() {
   const [isLoading, setIsLoading] = useState(false);
-  const [isPasskeyLoading, setIsPasskeyLoading] = useState(false);
   const router = useRouter();
-
-  // Conditional UI: preload passkeys for browser autofill
-  useEffect(() => {
-    if (
-      !PublicKeyCredential.isConditionalMediationAvailable ||
-      !PublicKeyCredential.isConditionalMediationAvailable()
-    ) {
-      return;
-    }
-    void authClient.signIn.passkey({
-      autoFill: true,
-      fetchOptions: {
-        onSuccess() {
-          router.push('/chat');
-        },
-      },
-    });
-  }, [router]);
 
   const handleGoogleSignIn = async () => {
     setIsLoading(true);
@@ -41,30 +20,9 @@ export default function SignInPage() {
     });
   };
 
-  const handlePasskeySignIn = async () => {
-    setIsPasskeyLoading(true);
-    const { data, error } = await authClient.signIn.passkey();
-    setIsPasskeyLoading(false);
-    if (error) {
-      toast.error('Passkey sign-in failed', {
-        description: (
-          <p>
-            {error.message ||
-              'Could not authenticate with passkey. Please try again.'}
-          </p>
-        ),
-      });
-      return;
-    }
-    if (data) {
-      router.push('/chat');
-    }
-  };
-
   return (
     <div className="bg-background flex min-h-screen flex-col items-center justify-center p-4">
       <div className="relative">
-        {/* <div className="pattern-dots absolute -bottom-5 -right-3 hidden h-2/3 w-full rounded-[35px] pattern-bg-transparent pattern-neutral-700 pattern-opacity-100 pattern-size-2 dark:pattern-neutral-300 md:block"></div> */}
         <div className="md:bg-card relative w-full max-w-sm px-6 pt-12 md:rounded-lg md:border md:px-12 md:pt-20 md:pb-16">
           <div className="mb-4 text-center">
             <div className="mb-12 flex justify-center">
@@ -81,11 +39,10 @@ export default function SignInPage() {
             <div className="bg-primary mb-6 h-0.75 w-4 rounded-full" />
           </div>
           <div className="flex flex-col items-center space-y-3">
-            {/* Google sign-in button */}
             <Button
               variant="default"
               type="button"
-              disabled={isLoading || isPasskeyLoading}
+              disabled={isLoading}
               onClick={handleGoogleSignIn}
               data-test-id="google-sign-in-button"
             >
@@ -97,27 +54,6 @@ export default function SignInPage() {
                     <GoogleIcon />
                     <span className="border-primary-foreground/10 border-l pl-2">
                       Continue with Google
-                    </span>
-                  </>
-                )}
-              </div>
-            </Button>
-
-            {/* Passkey sign-in button */}
-            <Button
-              variant="outline"
-              type="button"
-              disabled={isLoading || isPasskeyLoading}
-              onClick={handlePasskeySignIn}
-            >
-              <div className="flex min-w-48 items-center justify-center gap-2">
-                {isPasskeyLoading ? (
-                  <Spinner className="h-6 w-6" variant="ring" />
-                ) : (
-                  <>
-                    <Fingerprint className="h-4 w-4" />
-                    <span className="border-border border-l pl-2">
-                      Sign in with a Passkey
                     </span>
                   </>
                 )}
