@@ -10,6 +10,8 @@ import { WidgetManifestSchema } from '@/lib/widget-manifest';
 import { RuntimeManager } from '@/lib/runtime/runtime-manager';
 import { NATIVE_MANIFESTS } from '@/lib/widget-manifest-registry';
 import { useConversationManager } from '@/lib/chat/use-conversation-manager';
+import { DEFAULT_MODEL } from '@/lib/ai/models';
+import type { AiProvider } from '@/lib/ai/models';
 import { ChatSidebar } from '@/components/layout/chat-sidebar';
 import { ChatPane } from '@/components/chat/chat-pane';
 import { WidgetPanel } from '@/components/chat/widget-panel';
@@ -36,6 +38,11 @@ export function ChatClient({
 
   const [panels, setPanels] = useState<PanelEntry[]>([]);
   const [activePanelId, setActivePanelId] = useState<string | null>(null);
+
+  const aiProvider = (process.env.NEXT_PUBLIC_AI_PROVIDER ??
+    'gateway') as AiProvider;
+  const defaultModel = aiProvider !== 'mock' ? DEFAULT_MODEL[aiProvider] : '';
+  const [selectedModel, setSelectedModel] = useState(defaultModel);
   const activePanelIdRef = useRef<string | null>(null);
   useEffect(() => {
     activePanelIdRef.current = activePanelId;
@@ -149,6 +156,7 @@ export function ChatClient({
   } = useConversationManager(runtimeManagerRef, onBeforeSend, {
     conversationId,
     initialMessages,
+    model: selectedModel || undefined,
   });
 
   const getIframeRefCallback = useCallback((panelId: string) => {
@@ -307,6 +315,8 @@ export function ChatClient({
                 handleSubmit={handleSubmit}
                 isLoading={isLoading}
                 sendDirectMessage={sendDirectMessage}
+                selectedModel={selectedModel}
+                onModelChange={setSelectedModel}
               />
             </Pane>
             <Pane minSize="280px">
@@ -327,6 +337,8 @@ export function ChatClient({
             handleSubmit={handleSubmit}
             isLoading={isLoading}
             sendDirectMessage={sendDirectMessage}
+            selectedModel={selectedModel}
+            onModelChange={setSelectedModel}
             className="h-full border-r-0"
           />
         )}

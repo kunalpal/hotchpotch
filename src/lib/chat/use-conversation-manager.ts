@@ -19,6 +19,7 @@ const INJECTED_PREFIX = '__injected__';
 type ConversationOptions = {
   conversationId?: string;
   initialMessages?: UIMessage[];
+  model?: string;
 };
 
 // Accepts a ref so the hook never reads runtimeManager.current during render —
@@ -34,16 +35,21 @@ export function useConversationManager(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const addToolResultRef = useRef<((params: any) => void) | null>(null);
 
+  const model = options?.model;
   const transport = useMemo(
     () =>
       new DefaultChatTransport({
-        ...(options?.conversationId && {
-          body: { conversationId: options.conversationId },
-        }),
+        body: {
+          ...(options?.conversationId && {
+            conversationId: options.conversationId,
+          }),
+          ...(model && { model }),
+        },
       }),
     // conversationId is stable for the lifetime of a conversation (ChatClient remounts on change)
+    // model is tracked explicitly; other options fields are intentionally omitted
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    []
+    [model]
   );
 
   const { messages, sendMessage, status, addToolResult, setMessages } = useChat(

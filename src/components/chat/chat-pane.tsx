@@ -16,8 +16,11 @@ import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/utils/ui';
 import { MarkdownViewer } from '@/components/ui/markdown-viewer';
 import type { MockTrigger } from '@/lib/mock/mock-responses';
+import { PROVIDER_MODELS } from '@/lib/ai/models';
+import type { AiProvider } from '@/lib/ai/models';
 
-const IS_MOCK_MODE = process.env.NEXT_PUBLIC_MOCK_AI === 'true';
+const AI_PROVIDER = (process.env.NEXT_PUBLIC_AI_PROVIDER ??
+  'gateway') as AiProvider;
 
 const MOCK_TRIGGER_OPTIONS: Array<{
   trigger: MockTrigger;
@@ -42,6 +45,8 @@ interface ChatPaneProps {
   handleSubmit: (e: FormEvent<HTMLFormElement>) => void;
   isLoading: boolean;
   sendDirectMessage: (msg: string) => void;
+  selectedModel: string;
+  onModelChange: (model: string) => void;
   className?: string;
 }
 
@@ -52,8 +57,12 @@ export function ChatPane({
   handleSubmit,
   isLoading,
   sendDirectMessage,
+  selectedModel,
+  onModelChange,
   className,
 }: ChatPaneProps) {
+  const availableModels =
+    AI_PROVIDER !== 'mock' ? PROVIDER_MODELS[AI_PROVIDER] : [];
   return (
     <div
       className={cn(
@@ -115,7 +124,7 @@ export function ChatPane({
               }
             }}
           />
-          {IS_MOCK_MODE ? (
+          {AI_PROVIDER === 'mock' ? (
             <ButtonGroup>
               <Button type="submit" disabled={isLoading || !input.trim()}>
                 Send
@@ -139,9 +148,35 @@ export function ChatPane({
               </DropdownMenu>
             </ButtonGroup>
           ) : (
-            <Button type="submit" disabled={isLoading || !input.trim()}>
-              Send
-            </Button>
+            <ButtonGroup>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    disabled={isLoading}
+                    className="max-w-40 truncate text-xs"
+                  >
+                    {selectedModel.split('/').pop() ?? selectedModel}
+                    <ChevronDown className="ml-1 h-3 w-3 shrink-0" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  {availableModels.map((m) => (
+                    <DropdownMenuItem
+                      key={m}
+                      onClick={() => onModelChange(m)}
+                      className={m === selectedModel ? 'bg-accent' : ''}
+                    >
+                      {m}
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+              <Button type="submit" disabled={isLoading || !input.trim()}>
+                Send
+              </Button>
+            </ButtonGroup>
           )}
         </div>
       </form>

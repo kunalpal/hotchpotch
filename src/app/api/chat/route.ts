@@ -7,10 +7,13 @@ import {
   UIMessage,
 } from 'ai';
 import type { LanguageModelV3Prompt } from '@ai-sdk/provider';
+import { bedrock } from '@ai-sdk/amazon-bedrock';
 import { MockLanguageModelV3 } from 'ai/test';
 import { eq } from 'drizzle-orm';
 import { z } from 'zod';
 import { env } from '@/lib/env';
+import { DEFAULT_MODEL } from '@/lib/ai/models';
+import type { AiProvider } from '@/lib/ai/models';
 import {
   buildMockChunks,
   detectTrigger,
@@ -35,9 +38,18 @@ function buildMockModel() {
   });
 }
 
+function buildModel(requestModel?: string) {
+  const provider = (env.NEXT_PUBLIC_AI_PROVIDER ?? 'gateway') as AiProvider;
+  if (provider === 'mock') return buildMockModel();
+  const modelId = requestModel || env.AI_MODEL || DEFAULT_MODEL[provider];
+  if (provider === 'bedrock') return bedrock(modelId);
+  return gateway(modelId);
+}
+
 const RequestBodySchema = z.object({
   messages: z.array(z.unknown()),
   conversationId: z.string().optional(),
+  model: z.string().optional(),
 });
 
 export async function POST(request: Request) {
@@ -55,6 +67,7 @@ export async function POST(request: Request) {
 
   const messages = parsed.data.messages as UIMessage[];
   const conversationId = parsed.data.conversationId;
+  const requestModel = parsed.data.model;
 
   // Resolve the authenticated user (non-fatal — skip persistence if unauthenticated)
   let userId: number | null = null;
@@ -93,10 +106,7 @@ export async function POST(request: Request) {
     }
   }
 
-  const model =
-    process.env.NEXT_PUBLIC_MOCK_AI === 'true'
-      ? buildMockModel()
-      : gateway('deepseek/deepseek-v4-flash');
+  const model = buildModel(requestModel);
 
   const result = streamText({
     model,

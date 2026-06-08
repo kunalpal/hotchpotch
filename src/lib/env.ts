@@ -8,7 +8,13 @@ const envSchema = z.object({
   NEXT_PUBLIC_SITE_URL: z.url('NEXT_PUBLIC_SITE_URL must be a valid URL'),
   GOOGLE_CLIENT_ID: z.string().min(1, 'GOOGLE_CLIENT_ID is required'),
   GOOGLE_CLIENT_SECRET: z.string().min(1, 'GOOGLE_CLIENT_SECRET is required'),
-  // Optional when NEXT_PUBLIC_MOCK_AI=true; the gateway provider itself will error at call-time if missing
+  // AI provider: 'mock' | 'gateway' | 'bedrock'. Gateway and Bedrock will error at call-time if credentials are missing.
+  NEXT_PUBLIC_AI_PROVIDER: z
+    .enum(['mock', 'gateway', 'bedrock'])
+    .default('gateway'),
+  // Default model ID for the active provider. Falls back to the provider's built-in default if unset.
+  AI_MODEL: z.string().default(''),
+  // Required for 'gateway' provider; not needed for 'bedrock' (uses AWS env vars: AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_REGION)
   AI_GATEWAY_API_KEY: z.string().default(''),
   // Optional with defaults
   LOG_LEVEL: z.string().default('info'),
@@ -39,6 +45,8 @@ function validateEnv(): Env {
       GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID ?? 'build-placeholder',
       GOOGLE_CLIENT_SECRET:
         process.env.GOOGLE_CLIENT_SECRET ?? 'build-placeholder',
+      NEXT_PUBLIC_AI_PROVIDER: process.env.NEXT_PUBLIC_AI_PROVIDER ?? 'gateway',
+      AI_MODEL: process.env.AI_MODEL ?? '',
     } as unknown as Env;
     return _env;
   }
