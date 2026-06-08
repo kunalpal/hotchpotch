@@ -1,6 +1,6 @@
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
-import { eq, and } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 import { z } from 'zod';
 import { ensureAuthApi } from '@/utils/auth';
 import { db } from '@/utils/db';

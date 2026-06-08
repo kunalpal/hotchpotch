@@ -231,7 +231,6 @@ for (const mod of moduleRegistry) {
 // Global error handling
 // ---------------------------------------------------------------------------
 
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
 process.on('unhandledRejection', (reason, _promise) => {
   logger.error(`Unhandled Rejection: ${reason}`);
   process.exit(1);

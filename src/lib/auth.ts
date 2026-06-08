@@ -5,10 +5,6 @@ import { db } from '@/utils/db';
 import { env } from '@/lib/env';
 import * as authSchema from '@/db/auth';
 
-const appUrl = env.BETTER_AUTH_URL || 'http://localhost:3000';
-const appOrigin = new URL(appUrl).origin;
-const appHost = new URL(appUrl).hostname;
-
 export const auth = betterAuth({
   database: drizzleAdapter(db, { provider: 'pg', schema: authSchema }),
   socialProviders: {

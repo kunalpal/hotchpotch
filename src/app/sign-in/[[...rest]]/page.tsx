@@ -1,7 +1,6 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from '@bprogress/next/app';
 import { Button } from '@/components/ui/button';
 import { Logo } from '@/components/ui/logo';
 import { Spinner } from '@/components/ui/shadcn-io/spinner';
@@ -10,7 +9,6 @@ import { authClient } from '@/lib/auth-client';
 
 export default function SignInPage() {
   const [isLoading, setIsLoading] = useState(false);
-  const router = useRouter();
 
   const handleGoogleSignIn = async () => {
     setIsLoading(true);

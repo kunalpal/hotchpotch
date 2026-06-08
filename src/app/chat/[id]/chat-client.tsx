@@ -297,7 +297,7 @@ export function ChatClient({
     });
     rm.start();
     return () => rm.stop();
-  }, [injectTurn]);
+  }, [injectTurn, conversationId]);
 
   const hasWidgets = panels.length > 0;
 
