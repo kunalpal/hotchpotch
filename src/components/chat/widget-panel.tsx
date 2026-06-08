@@ -79,33 +79,67 @@ export function WidgetPanel({
     panels.findIndex((p) => p.panelId === effectiveActivePanelId)
   );
 
+  // When multiple panels exist, shrink each card so adjacent ones peek in.
+  // PEEK_PX: visible card width from each side-neighbour.
+  // GAP_PX: space between active card edge and the peeking neighbour edge.
+  // PADDING_X: slot padding → PEEK_PX + GAP_PX.
+  // STEP_PX: how far each slot shifts per index step → (2 * PADDING_X) - GAP_PX.
+  const multiPanel = panels.length > 1;
+  const PADDING_X = multiPanel ? 52 : 24;
+  const PADDING_Y = 24;
+  const STEP_PX = multiPanel ? PADDING_X * 2 - 8 : 0;
+
   return (
     <div className="flex h-full min-w-0 flex-col" style={DOT_BG}>
       {/* Panel area — all panels stay in the DOM via translateX so iframes
           never lose their browsing context. */}
       <div className="relative flex-1 overflow-hidden">
         {panels.map((panel, index) => {
-          const offset = (index - activeIndex) * 100;
+          const offset = index - activeIndex;
+          const isActive = offset === 0;
           return (
             <div
               key={panel.panelId}
-              className="absolute inset-0 transition-transform duration-300 ease-out"
+              className="absolute inset-0 transition-[transform,opacity] duration-300 ease-out"
               style={{
-                padding: 24,
-                transform: `translateX(${offset}%)`,
+                padding: `${PADDING_Y}px ${PADDING_X}px`,
+                transform: `translateX(calc(${offset} * (100% - ${STEP_PX}px)))`,
+                opacity: isActive ? 1 : 0.55,
                 willChange: 'transform',
               }}
             >
-              <WidgetCard
-                panel={panel}
-                NativeComponent={getNativeComponent(panel)}
-                iframeRef={getIframeRefCallback(panel.panelId)}
-                onClose={() => closePanel(panel.panelId)}
-                className="h-full w-full"
-              />
+              <div
+                className="h-full w-full transition-transform duration-300 ease-out"
+                style={{ transform: isActive ? undefined : 'scale(0.92)' }}
+              >
+                <WidgetCard
+                  panel={panel}
+                  NativeComponent={getNativeComponent(panel)}
+                  iframeRef={getIframeRefCallback(panel.panelId)}
+                  onClose={() => closePanel(panel.panelId)}
+                  className="h-full w-full"
+                />
+              </div>
             </div>
           );
         })}
+
+        {/* Click zones over the peek strips — must be last children so they
+            sit above the panel slots in pointer-event order. */}
+        {activeIndex > 0 && (
+          <div
+            className="absolute top-0 bottom-0 left-0 z-30 cursor-pointer"
+            style={{ width: PADDING_X }}
+            onClick={() => setActivePanelId(panels[activeIndex - 1].panelId)}
+          />
+        )}
+        {activeIndex < panels.length - 1 && (
+          <div
+            className="absolute top-0 right-0 bottom-0 z-30 cursor-pointer"
+            style={{ width: PADDING_X }}
+            onClick={() => setActivePanelId(panels[activeIndex + 1].panelId)}
+          />
+        )}
       </div>
 
       <WidgetDotNav

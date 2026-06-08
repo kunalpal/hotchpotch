@@ -1,5 +1,6 @@
 'use client';
 
+import { useCallback, useLayoutEffect, useRef } from 'react';
 import { cn } from '@/utils/ui';
 import type { PanelEntry } from './widget-panel';
 
@@ -14,8 +15,35 @@ export function WidgetDotNav({
   activePanelId,
   setActivePanelId,
 }: WidgetDotNavProps) {
+  // Always-current ref so the wheel handler never closes over stale state.
+  const stateRef = useRef({ panels, activePanelId, setActivePanelId });
+  useLayoutEffect(() => {
+    stateRef.current = { panels, activePanelId, setActivePanelId };
+  });
+
+  // Timestamp of the last processed scroll step — limits one step per gesture.
+  const lastStepAt = useRef(0);
+
+  const onWheel = useCallback((e: React.WheelEvent) => {
+    const { panels, activePanelId, setActivePanelId } = stateRef.current;
+    if (panels.length < 2) return;
+    e.preventDefault();
+    const now = Date.now();
+    if (now - lastStepAt.current < 200) return;
+    lastStepAt.current = now;
+    const activeIndex = panels.findIndex((p) => p.panelId === activePanelId);
+    const next =
+      e.deltaY > 0
+        ? Math.min(activeIndex + 1, panels.length - 1)
+        : Math.max(activeIndex - 1, 0);
+    if (next !== activeIndex) setActivePanelId(panels[next].panelId);
+  }, []);
+
   return (
-    <div className="flex shrink-0 items-center justify-center py-3">
+    <div
+      className="flex shrink-0 items-center justify-center py-3"
+      onWheel={onWheel}
+    >
       <div className="border-border bg-card flex items-center gap-3 rounded-full border px-4 py-2.5 shadow-sm">
         {panels.map((panel) => {
           const isActive = panel.panelId === activePanelId;
