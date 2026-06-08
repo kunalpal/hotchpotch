@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
+import { useId, useLayoutEffect, useRef, useState } from 'react';
 import { useWidgetHost } from '@/lib/hooks/use-widget-host';
 import { PROTOCOL_VERSION } from '@/lib/widget-protocol';
 import type { NotesPayload } from '@/lib/widget-protocol';
@@ -28,76 +28,73 @@ export function DataNotes({ host }: Props) {
     notesRef.current = notes;
   });
 
-  const { payload, sendAction } = useWidgetHost<NotesPayload>(
-    host,
-    (envelope) => {
-      if (envelope.type !== 'SKILL_INVOKE') return;
-      const { skill_id, type, query } = envelope.payload as {
-        skill_id: string;
-        type: string;
-        query: unknown;
-      };
-
-      if (type === 'context_injector') {
-        const pinnedNotes = notesRef.current.filter((n) => n.pinned);
-        const summary =
-          pinnedNotes.length > 0
-            ? `Pinned notes: ${pinnedNotes.map((n) => `"${n.title}"${n.body ? ` — ${n.body}` : ''}`).join('; ')}`
-            : '';
-        host.receiveFromWidget({
-          protocol: PROTOCOL_VERSION,
-          message_id: crypto.randomUUID(),
-          reply_to: null,
-          type: 'SKILL_RESULT',
-          timestamp: Date.now(),
-          payload: { skill_id, type: 'context_injector', result: summary },
-        });
-      } else if (type === 'intent_interceptor') {
-        const queryText = typeof query === 'string' ? query : '';
-        const content =
-          queryText
-            .replace(
-              /^(note this|add a note|add note|jot down|write this down|save this|remember this|add to notes)[:\s]*/i,
-              ''
-            )
-            .trim() || queryText.trim();
-
-        const noteTitle = content.slice(0, 80) || 'Note';
-        const noteBody = content.length > 80 ? content.slice(80).trim() : '';
-        setNotes((prev) => [
-          ...prev,
-          {
-            id: crypto.randomUUID(),
-            title: noteTitle,
-            body: noteBody,
-            pinned: false,
-          },
-        ]);
-
-        host.receiveFromWidget({
-          protocol: PROTOCOL_VERSION,
-          message_id: crypto.randomUUID(),
-          reply_to: null,
-          type: 'SKILL_RESULT',
-          timestamp: Date.now(),
-          payload: {
-            skill_id,
-            type: 'intent_interceptor',
-            result: {
-              response: `Got it — I've added a note: "${noteTitle}"`,
-              payload: null,
-            },
-          },
-        });
-      }
+  const { sendAction } = useWidgetHost<NotesPayload>(host, (envelope) => {
+    if (envelope.type === 'MOUNT' || envelope.type === 'REPLACE') {
+      const p = (envelope.payload.payload ??
+        envelope.payload.initial_payload) as NotesPayload | undefined;
+      if (p?.notes) setNotes(p.notes);
+      return;
     }
-  );
+    if (envelope.type !== 'SKILL_INVOKE') return;
+    const { skill_id, type, query } = envelope.payload as {
+      skill_id: string;
+      type: string;
+      query: unknown;
+    };
 
-  // Seed notes from LLM payload on MOUNT/REPLACE
-  useEffect(() => {
-    if (!payload?.notes) return;
-    setNotes(payload.notes);
-  }, [payload]);
+    if (type === 'context_injector') {
+      const pinnedNotes = notesRef.current.filter((n) => n.pinned);
+      const summary =
+        pinnedNotes.length > 0
+          ? `Pinned notes: ${pinnedNotes.map((n) => `"${n.title}"${n.body ? ` — ${n.body}` : ''}`).join('; ')}`
+          : '';
+      host.receiveFromWidget({
+        protocol: PROTOCOL_VERSION,
+        message_id: crypto.randomUUID(),
+        reply_to: null,
+        type: 'SKILL_RESULT',
+        timestamp: Date.now(),
+        payload: { skill_id, type: 'context_injector', result: summary },
+      });
+    } else if (type === 'intent_interceptor') {
+      const queryText = typeof query === 'string' ? query : '';
+      const content =
+        queryText
+          .replace(
+            /^(note this|add a note|add note|jot down|write this down|save this|remember this|add to notes)[:\s]*/i,
+            ''
+          )
+          .trim() || queryText.trim();
+
+      const noteTitle = content.slice(0, 80) || 'Note';
+      const noteBody = content.length > 80 ? content.slice(80).trim() : '';
+      setNotes((prev) => [
+        ...prev,
+        {
+          id: crypto.randomUUID(),
+          title: noteTitle,
+          body: noteBody,
+          pinned: false,
+        },
+      ]);
+
+      host.receiveFromWidget({
+        protocol: PROTOCOL_VERSION,
+        message_id: crypto.randomUUID(),
+        reply_to: null,
+        type: 'SKILL_RESULT',
+        timestamp: Date.now(),
+        payload: {
+          skill_id,
+          type: 'intent_interceptor',
+          result: {
+            response: `Got it — I've added a note: "${noteTitle}"`,
+            payload: null,
+          },
+        },
+      });
+    }
+  });
 
   const formId = useId();
   const titleRef = useRef<HTMLInputElement>(null);

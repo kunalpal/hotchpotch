@@ -89,7 +89,10 @@ export class MessageBus {
     );
   }
 
-  private emit<K extends keyof BusEvents>(event: K, ...args: BusEvents[K]): void {
+  private emit<K extends keyof BusEvents>(
+    event: K,
+    ...args: BusEvents[K]
+  ): void {
     this.listeners.get(event)?.forEach((h) => h(...args));
   }
 }

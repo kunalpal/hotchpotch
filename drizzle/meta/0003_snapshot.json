@@ -95,12 +95,8 @@
           "name": "auth.account_user_id_auth.user_id_fk",
           "tableFrom": "auth.account",
           "tableTo": "auth.user",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -172,12 +168,8 @@
           "name": "auth.session_user_id_auth.user_id_fk",
           "tableFrom": "auth.session",
           "tableTo": "auth.user",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -187,9 +179,7 @@
         "auth.session_token_unique": {
           "name": "auth.session_token_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "token"
-          ]
+          "columns": ["token"]
         }
       },
       "policies": {},
@@ -266,9 +256,7 @@
         "auth.user_email_unique": {
           "name": "auth.user_email_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "email"
-          ]
+          "columns": ["email"]
         }
       },
       "policies": {},
@@ -367,12 +355,8 @@
           "name": "chat.conversation_user_id_auth.user_id_fk",
           "tableFrom": "chat.conversation",
           "tableTo": "auth.user",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -447,12 +431,8 @@
           "name": "chat.message_conversation_id_chat.conversation_id_fk",
           "tableFrom": "chat.message",
           "tableTo": "chat.conversation",
-          "columnsFrom": [
-            "conversation_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["conversation_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -499,12 +479,8 @@
           "name": "chat.widget_snapshot_conversation_id_chat.conversation_id_fk",
           "tableFrom": "chat.widget_snapshot",
           "tableTo": "chat.conversation",
-          "columnsFrom": [
-            "conversation_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["conversation_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -512,10 +488,7 @@
       "compositePrimaryKeys": {
         "chat.widget_snapshot_conversation_id_widget_id_pk": {
           "name": "chat.widget_snapshot_conversation_id_widget_id_pk",
-          "columns": [
-            "conversation_id",
-            "widget_id"
-          ]
+          "columns": ["conversation_id", "widget_id"]
         }
       },
       "uniqueConstraints": {},

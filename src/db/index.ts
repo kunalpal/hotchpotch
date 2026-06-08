@@ -2,4 +2,3 @@
 // The db/connection.ts imports this as `* as schema`.
 export * from './auth';
 export * from './chat';
-

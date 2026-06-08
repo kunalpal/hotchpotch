@@ -43,16 +43,22 @@ export function ChatClient({
 
   const mountIframePanel = useCallback(async (widgetId: string) => {
     if (mountedWidgetIdsRef.current.has(widgetId)) return;
+    // Claim the slot synchronously before any await so concurrent calls
+    // (e.g. React StrictMode double-invoking effects) don't both proceed.
+    mountedWidgetIdsRef.current.add(widgetId);
     const slug = widgetId.replace(/\./g, '-');
     let manifest: WidgetManifest;
     try {
       const res = await fetch(`/widgets/${slug}/manifest.json`);
-      if (!res.ok) return;
+      if (!res.ok) {
+        mountedWidgetIdsRef.current.delete(widgetId);
+        return;
+      }
       manifest = WidgetManifestSchema.parse(await res.json());
     } catch {
+      mountedWidgetIdsRef.current.delete(widgetId);
       return;
     }
-    mountedWidgetIdsRef.current.add(widgetId);
     pendingMountsRef.current.set(widgetId, {
       manifest,
       widgetSrc: manifest.entry!,

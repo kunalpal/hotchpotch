@@ -172,7 +172,9 @@ export function useConversationManager(
 
       const buffered = runtimeManagerRef.current.flushAllPassiveBuffers();
       if (buffered.length > 0) {
-        const context = buffered.map((t) => `[Widget context: ${t}]`).join('\n');
+        const context = buffered
+          .map((t) => `[Widget context: ${t}]`)
+          .join('\n');
         text = `${context}\n\n${text}`;
       }
 

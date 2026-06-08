@@ -137,9 +137,14 @@ export class SkillRouter extends RequestBroker {
     type: string,
     query: unknown
   ): Promise<unknown> {
-    const promise = this.track(skillId, host.panelId, SKILL_TIMEOUT_MS, (id) => {
-      this.settle(id, null);
-    });
+    const promise = this.track(
+      skillId,
+      host.panelId,
+      SKILL_TIMEOUT_MS,
+      (id) => {
+        this.settle(id, null);
+      }
+    );
 
     this.sendFn(
       host,
