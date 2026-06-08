@@ -18,7 +18,7 @@ import { renderTemplate } from '@/lib/runtime/template-renderer';
 interface RuntimeCallbacks {
   onWidgetFailed: ((panelId: string) => void) | null;
   onPanelUnmounted: ((panelId: string) => void) | null;
-  onBackgroundToolComplete: ((panelId: string) => void) | null;
+  onToolComplete: ((panelId: string) => void) | null;
   onToolRegistryUpdate: ((add: string[], remove: string[]) => void) | null;
   onInjectTurn: ((content: string) => void) | null;
   onRenderWidgetStarted: ((panelId: string) => void) | null;
@@ -31,11 +31,16 @@ export class RuntimeManager {
     string,
     Array<{ payload: unknown; updateStrategy: 'mount' | 'replace' }>
   >();
+  // Outbound envelopes queued while a host is registered but not yet ready.
+  // Owned here rather than on WidgetHost so handleReady can flush via bus.send()
+  // for both iframe and native hosts symmetrically.
+  private pendingOutbound = new Map<string, Envelope[]>();
   private messageListener: ((event: MessageEvent) => void) | null = null;
+  private busUnsub: (() => void) | null = null;
   private callbacks: RuntimeCallbacks = {
     onWidgetFailed: null,
     onPanelUnmounted: null,
-    onBackgroundToolComplete: null,
+    onToolComplete: null,
     onToolRegistryUpdate: null,
     onInjectTurn: null,
     onRenderWidgetStarted: null,
@@ -50,7 +55,7 @@ export class RuntimeManager {
   }
 
   start(): void {
-    this.bus.onInbound((panelId, envelope) =>
+    this.busUnsub = this.bus.on('inbound', (panelId, envelope) =>
       this.handleInbound(panelId, envelope)
     );
 
@@ -62,12 +67,14 @@ export class RuntimeManager {
     this.messageListener = this.handleMessage.bind(this);
     window.addEventListener('message', this.messageListener);
 
-    this.toolDispatcher.onBackgroundComplete = (panelId) => {
-      this.callbacks.onBackgroundToolComplete?.(panelId);
+    this.toolDispatcher.onToolComplete = (panelId) => {
+      this.callbacks.onToolComplete?.(panelId);
     };
   }
 
   stop(): void {
+    this.busUnsub?.();
+    this.busUnsub = null;
     if (this.messageListener) {
       window.removeEventListener('message', this.messageListener);
       this.messageListener = null;
@@ -198,7 +205,9 @@ export class RuntimeManager {
         type: envelope.type,
         reason: 'host-not-ready',
       });
-      host.pendingOutbound.push(envelope);
+      const queue = this.pendingOutbound.get(panelId) ?? [];
+      queue.push(envelope);
+      this.pendingOutbound.set(panelId, queue);
     }
   }
 
@@ -215,9 +224,10 @@ export class RuntimeManager {
       this.hosts.delete(panelId);
       this.passiveBuffers.delete(panelId);
     }
-    // Always clean up pending renders and notify the UI, even if the iframe host
+    // Always clean up all queues and notify the UI, even if the iframe host
     // never registered (panel closed before the element was bound to the DOM).
     this.pendingRenders.delete(panelId);
+    this.pendingOutbound.delete(panelId);
     this.callbacks.onPanelUnmounted?.(panelId);
     this.bus.lifecycle('widget-unmounted', panelId, {});
   }
@@ -262,7 +272,7 @@ export class RuntimeManager {
     matchedHost.deliverToHost(parsed.data);
   }
 
-  /** Unified inbound handler called by both iframe and native hosts */
+  /** Unified inbound handler — called by the bus 'inbound' event for both iframe and native hosts */
   private handleInbound(panelId: string, envelope: InboundEnvelope): void {
     switch (envelope.type) {
       case 'READY':
@@ -322,14 +332,16 @@ export class RuntimeManager {
       host.clearReadyTimeout();
     }
     host.status = 'ready';
+
+    const queued = this.pendingOutbound.get(panelId) ?? [];
+    this.pendingOutbound.delete(panelId);
     this.bus.lifecycle('widget-ready', panelId, {
-      pendingOutboundCount: host.pendingOutbound.length,
+      pendingOutboundCount: queued.length,
     });
 
-    for (const envelope of host.pendingOutbound) {
+    for (const envelope of queued) {
       this.bus.send(host, envelope);
     }
-    host.pendingOutbound = [];
   }
 
   private handleAction(panelId: string, envelope: InboundEnvelope): void {

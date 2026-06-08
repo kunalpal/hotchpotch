@@ -13,6 +13,10 @@ export type LifecycleEvent =
   | 'outbound-queued-loading'
   | 'outbound-queued-pending-renders';
 
+type BusEvents = {
+  inbound: [panelId: string, envelope: InboundEnvelope];
+};
+
 const OUT_STYLE = 'color:#4CAF50;font-weight:bold';
 const IN_STYLE = 'color:#2196F3;font-weight:bold';
 const LFE_STYLE = 'color:#FF9800;font-weight:bold';
@@ -20,14 +24,20 @@ const LFE_STYLE = 'color:#FF9800;font-weight:bold';
 export class MessageBus {
   private seq = 0;
   private startTime = Date.now();
-  private inboundHandler:
-    | ((panelId: string, envelope: InboundEnvelope) => void)
-    | null = null;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private listeners = new Map<string, Set<(...args: any[]) => void>>();
 
-  onInbound(
-    handler: (panelId: string, envelope: InboundEnvelope) => void
-  ): void {
-    this.inboundHandler = handler;
+  on<K extends keyof BusEvents>(
+    event: K,
+    handler: (...args: BusEvents[K]) => void
+  ): () => void {
+    let set = this.listeners.get(event);
+    if (!set) {
+      set = new Set();
+      this.listeners.set(event, set);
+    }
+    set.add(handler);
+    return () => set!.delete(handler);
   }
 
   /** Send an outbound envelope from RuntimeManager/ToolDispatcher/SkillRouter to a widget host. */
@@ -45,7 +55,7 @@ export class MessageBus {
     host.send(envelope);
   }
 
-  /** Receive an inbound envelope from a widget and route it to the handler registered via onInbound. */
+  /** Receive an inbound envelope from a widget and emit it to all 'inbound' subscribers. */
   receive(panelId: string, envelope: InboundEnvelope): void {
     const n = ++this.seq;
     const t = Date.now() - this.startTime;
@@ -56,7 +66,7 @@ export class MessageBus {
       `type=${envelope.type}`,
       envelope.payload
     );
-    this.inboundHandler?.(panelId, envelope);
+    this.emit('inbound', panelId, envelope);
   }
 
   /** Log a widget/panel lifecycle event (no message routing — informational only). */
@@ -74,5 +84,9 @@ export class MessageBus {
       `panelId=${panelId}`,
       detail ?? ''
     );
+  }
+
+  private emit<K extends keyof BusEvents>(event: K, ...args: BusEvents[K]): void {
+    this.listeners.get(event)?.forEach((h) => h(...args));
   }
 }

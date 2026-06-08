@@ -10,7 +10,6 @@ export class IframeWidgetHost implements WidgetHost {
   readonly origin: string;
 
   status: HostStatus = 'loading';
-  pendingOutbound: Envelope[] = [];
   registeredTools: string[] = [];
 
   private messageHandler: ((envelope: InboundEnvelope) => void) | null = null;
@@ -63,6 +62,5 @@ export class IframeWidgetHost implements WidgetHost {
       this.send(createEnvelope('UNMOUNT', { reason: 'user_closed' }));
     }
     this.messageHandler = null;
-    this.pendingOutbound = [];
   }
 }

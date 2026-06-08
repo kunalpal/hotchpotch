@@ -1,14 +1,9 @@
-import { v4 as uuidv4 } from 'uuid';
-import { PROTOCOL_VERSION } from '@/lib/widget-protocol';
+import { createEnvelope } from '@/lib/widget-protocol';
 import type { Envelope, InboundEnvelope } from '@/lib/widget-protocol';
 import type { WidgetHost } from '@/lib/runtime/widget-host';
+import { RequestBroker } from '@/lib/runtime/request-broker';
 
 const SKILL_TIMEOUT_MS = 3000;
-
-interface PendingSkill {
-  resolve: (result: unknown) => void;
-  timer: ReturnType<typeof setTimeout>;
-}
 
 /**
  * Routes user messages through widget-registered skills before and after
@@ -19,12 +14,13 @@ interface PendingSkill {
  *   - intent_interceptor: widgets handle an intent fully, skipping model call
  *   - output_processor: widgets enrich render_widget payloads post-model
  */
-export class SkillRouter {
-  private pending = new Map<string, PendingSkill>();
+export class SkillRouter extends RequestBroker {
   private sendFn: (host: WidgetHost, envelope: Envelope) => void = (h, e) =>
     h.send(e);
 
-  constructor(private readonly hosts: Map<string, WidgetHost>) {}
+  constructor(private readonly hosts: Map<string, WidgetHost>) {
+    super();
+  }
 
   setSendFn(fn: (host: WidgetHost, envelope: Envelope) => void): void {
     this.sendFn = fn;
@@ -132,11 +128,7 @@ export class SkillRouter {
   handleSkillResult(envelope: InboundEnvelope): void {
     if (envelope.type !== 'SKILL_RESULT') return;
     const { skill_id, result } = envelope.payload;
-    const pending = this.pending.get(skill_id);
-    if (!pending) return;
-    clearTimeout(pending.timer);
-    this.pending.delete(skill_id);
-    pending.resolve(result);
+    this.settle(skill_id, result);
   }
 
   private invokeSkill(
@@ -145,29 +137,22 @@ export class SkillRouter {
     type: string,
     query: unknown
   ): Promise<unknown> {
-    return new Promise((resolve) => {
-      const timer = setTimeout(() => {
-        this.pending.delete(skillId);
-        resolve(null);
-      }, SKILL_TIMEOUT_MS);
-
-      this.pending.set(skillId, { resolve, timer });
-
-      this.sendFn(host, {
-        protocol: PROTOCOL_VERSION,
-        message_id: uuidv4(),
-        reply_to: null,
-        type: 'SKILL_INVOKE',
-        timestamp: Date.now(),
-        payload: {
-          skill_id: skillId,
-          type,
-          query,
-          context: {},
-          timeout_ms: SKILL_TIMEOUT_MS,
-        },
-      });
+    const promise = this.track(skillId, host.panelId, SKILL_TIMEOUT_MS, (id) => {
+      this.settle(id, null);
     });
+
+    this.sendFn(
+      host,
+      createEnvelope('SKILL_INVOKE', {
+        skill_id: skillId,
+        type,
+        query,
+        context: {},
+        timeout_ms: SKILL_TIMEOUT_MS,
+      })
+    );
+
+    return promise;
   }
 
   private messageMatchesTriggers(message: string, triggers: string[]): boolean {

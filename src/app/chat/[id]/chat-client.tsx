@@ -36,6 +36,10 @@ export function ChatClient({
 
   const [panels, setPanels] = useState<PanelEntry[]>([]);
   const [activePanelId, setActivePanelId] = useState<string | null>(null);
+  const activePanelIdRef = useRef<string | null>(null);
+  useEffect(() => {
+    activePanelIdRef.current = activePanelId;
+  }, [activePanelId]);
 
   const mountIframePanel = useCallback(async (widgetId: string) => {
     if (mountedWidgetIdsRef.current.has(widgetId)) return;
@@ -238,7 +242,8 @@ export function ChatClient({
         mountedWidgetIdsRef.current.delete(panelId);
         setPanels((prev) => prev.filter((p) => p.panelId !== panelId));
       },
-      onBackgroundToolComplete: (panelId) => {
+      onToolComplete: (panelId) => {
+        if (panelId === activePanelIdRef.current) return;
         setPanels((prev) =>
           prev.map((p) => (p.panelId === panelId ? { ...p, pulsing: true } : p))
         );

@@ -7,7 +7,6 @@ export interface WidgetHost {
   readonly panelId: string;
   readonly manifest: WidgetManifest;
   status: HostStatus;
-  pendingOutbound: Envelope[];
   /** Registered tools after REGISTER_TOOLS handshake, namespaced by panelId */
   registeredTools: string[];
   send(envelope: Envelope): void;

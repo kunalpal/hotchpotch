@@ -9,7 +9,6 @@ export class NativeWidgetHost implements WidgetHost {
   readonly manifest: WidgetManifest;
 
   status: HostStatus = 'loading';
-  pendingOutbound: Envelope[] = [];
   registeredTools: string[] = [];
 
   private messageHandler: ((envelope: InboundEnvelope) => void) | null = null;
@@ -21,37 +20,33 @@ export class NativeWidgetHost implements WidgetHost {
   }
 
   /**
-   * Called by useWidgetHost on component mount. Immediately emits READY
-   * (no timeout needed for native widgets) and flushes any queued outbound
-   * envelopes to the widget handler.
+   * Called by useWidgetHost on component mount. Emits READY through the bus
+   * (via messageHandler, wired to bus.receive in mountNativeWidget), which
+   * triggers RuntimeManager.handleReady to set status='ready' and flush any
+   * queued outbound envelopes through bus.send().
    */
   bind(widgetHandler: (envelope: Envelope) => void): void {
     this.widgetHandler = widgetHandler;
-    this.status = 'ready';
-
-    // Synthesise READY → runtime treats native widgets as immediately ready
-    const readyEnvelope: InboundEnvelope = {
+    // Emit READY while still 'loading' so handleReady processes it normally.
+    // RuntimeManager.handleReady sets status='ready' and flushes pendingOutbound.
+    this.messageHandler?.({
       protocol: PROTOCOL_VERSION,
       message_id: uuidv4(),
       reply_to: null,
       type: 'READY',
       timestamp: Date.now(),
       payload: {},
-    };
-    this.messageHandler?.(readyEnvelope);
-
-    // Flush any envelopes that arrived before the widget component mounted
-    for (const envelope of this.pendingOutbound) {
-      widgetHandler(envelope);
-    }
-    this.pendingOutbound = [];
+    });
   }
 
   send(envelope: Envelope): void {
     if (this.widgetHandler) {
       this.widgetHandler(envelope);
     } else {
-      this.pendingOutbound.push(envelope);
+      console.warn(
+        '[NativeWidgetHost] send() called before bind() — dropping',
+        envelope.type
+      );
     }
   }
 
@@ -61,8 +56,8 @@ export class NativeWidgetHost implements WidgetHost {
 
   /**
    * Called by useWidgetHost when the widget sends an inbound message (e.g. ACTION).
-   * Routes through the same messageHandler as IframeWidgetHost, so RuntimeManager
-   * processes it identically regardless of host type.
+   * Routes through messageHandler (wired to bus.receive), so RuntimeManager
+   * processes it identically to iframe widget messages.
    */
   receiveFromWidget(envelope: InboundEnvelope): void {
     this.messageHandler?.(envelope);
@@ -71,6 +66,5 @@ export class NativeWidgetHost implements WidgetHost {
   dispose(): void {
     this.widgetHandler = null;
     this.messageHandler = null;
-    this.pendingOutbound = [];
   }
 }
