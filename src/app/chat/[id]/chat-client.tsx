@@ -179,6 +179,21 @@ export function ChatClient({
     runtimeManagerRef.current.unmountWidget(panelId);
   }, []);
 
+  // Fetch persisted widget snapshots and seed the runtime before widgets mount.
+  useEffect(() => {
+    void fetch(`/api/conversations/${conversationId}/snapshots`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data: Record<string, Record<string, unknown>> | null) => {
+        if (!data) return;
+        const rm = runtimeManagerRef.current;
+        for (const [widgetId, state] of Object.entries(data)) {
+          rm.loadSnapshot(widgetId, state);
+        }
+      });
+    // conversationId is stable for the lifetime of this ChatClient instance
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // Replay render_widget calls from history loaded at page load.
   // onToolCall only fires for live stream events, not for initialMessages.
   useEffect(() => {
@@ -254,6 +269,16 @@ export function ChatClient({
             )
           );
         }, 1000);
+      },
+      onStateSnapshot: (panelId, state) => {
+        void fetch(`/api/conversations/${conversationId}/snapshots`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ widgetId: panelId, state }),
+        });
+      },
+      onHeightChanged: (_panelId, _height) => {
+        // TODO: wire to iframe ref to apply dynamic height
       },
     });
     rm.start();

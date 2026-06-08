@@ -22,6 +22,10 @@ interface RuntimeCallbacks {
   onToolRegistryUpdate: ((add: string[], remove: string[]) => void) | null;
   onInjectTurn: ((content: string) => void) | null;
   onRenderWidgetStarted: ((panelId: string) => void) | null;
+  onStateSnapshot:
+    | ((panelId: string, state: Record<string, unknown>) => void)
+    | null;
+  onHeightChanged: ((panelId: string, height: number) => void) | null;
 }
 
 export class RuntimeManager {
@@ -35,6 +39,9 @@ export class RuntimeManager {
   // Owned here rather than on WidgetHost so handleReady can flush via bus.send()
   // for both iframe and native hosts symmetrically.
   private pendingOutbound = new Map<string, Envelope[]>();
+  // Last known state for each widget, seeded from DB on load and updated on
+  // every STATE_SNAPSHOT. Used to send RESTORE_STATE after READY.
+  private snapshots = new Map<string, Record<string, unknown>>();
   private messageListener: ((event: MessageEvent) => void) | null = null;
   private busUnsub: (() => void) | null = null;
   private callbacks: RuntimeCallbacks = {
@@ -44,6 +51,8 @@ export class RuntimeManager {
     onToolRegistryUpdate: null,
     onInjectTurn: null,
     onRenderWidgetStarted: null,
+    onStateSnapshot: null,
+    onHeightChanged: null,
   };
 
   readonly bus = new MessageBus();
@@ -236,8 +245,17 @@ export class RuntimeManager {
     return this.hosts.get(panelId);
   }
 
-  flushPassiveBuffer(panelId: string): string[] {
-    return this.passiveBuffers.get(panelId)?.flush() ?? [];
+  flushAllPassiveBuffers(): string[] {
+    const all: string[] = [];
+    for (const buffer of this.passiveBuffers.values()) {
+      all.push(...buffer.flush());
+    }
+    return all;
+  }
+
+  /** Seed a widget's snapshot from DB at page load, before the widget mounts. */
+  loadSnapshot(widgetId: string, state: Record<string, unknown>): void {
+    this.snapshots.set(widgetId, state);
   }
 
   /** Global window.message handler — routes to the matching IframeWidgetHost */
@@ -293,6 +311,21 @@ export class RuntimeManager {
       case 'REGISTER_SKILLS':
         // Skills are declared in the manifest; REGISTER_SKILLS is informational only
         break;
+      case 'STATE_SNAPSHOT': {
+        const { state } = envelope.payload;
+        this.snapshots.set(panelId, state);
+        this.bus.lifecycle('state-snapshot-received', panelId, {
+          keys: Object.keys(state),
+        });
+        this.callbacks.onStateSnapshot?.(panelId, state);
+        break;
+      }
+      case 'HEIGHT_CHANGED':
+        this.bus.lifecycle('height-changed', panelId, {
+          height: envelope.payload.height,
+        });
+        this.callbacks.onHeightChanged?.(panelId, envelope.payload.height);
+        break;
     }
   }
 
@@ -341,6 +374,14 @@ export class RuntimeManager {
 
     for (const envelope of queued) {
       this.bus.send(host, envelope);
+    }
+
+    const snapshot = this.snapshots.get(panelId);
+    if (snapshot) {
+      this.bus.lifecycle('restoring-snapshot', panelId, {
+        keys: Object.keys(snapshot),
+      });
+      this.bus.send(host, createEnvelope('RESTORE_STATE', { state: snapshot }));
     }
   }
 

@@ -29,7 +29,6 @@ export function useConversationManager(
   options?: ConversationOptions
 ) {
   const [input, setInput] = useState('');
-  const lastRenderedWidgetIdRef = useRef<string | null>(null);
   // Stable ref for addToolResult so the onToolCall closure can call it without
   // capturing a stale value. Typed as `any` to avoid the SDK's complex generic.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -58,7 +57,6 @@ export function useConversationManager(
             update_strategy?: 'mount' | 'replace';
             payload: unknown;
           };
-          lastRenderedWidgetIdRef.current = widget_id;
           void runtimeManagerRef.current.onRenderWidget(
             widget_id,
             payload,
@@ -172,16 +170,10 @@ export function useConversationManager(
 
       let text = trimmed;
 
-      if (lastRenderedWidgetIdRef.current) {
-        const buffered = runtimeManagerRef.current.flushPassiveBuffer(
-          lastRenderedWidgetIdRef.current
-        );
-        if (buffered.length > 0) {
-          const context = buffered
-            .map((t) => `[Widget context: ${t}]`)
-            .join('\n');
-          text = `${context}\n\n${text}`;
-        }
+      const buffered = runtimeManagerRef.current.flushAllPassiveBuffers();
+      if (buffered.length > 0) {
+        const context = buffered.map((t) => `[Widget context: ${t}]`).join('\n');
+        text = `${context}\n\n${text}`;
       }
 
       if (contextLines.length > 0) {

@@ -5,6 +5,7 @@ import {
   jsonb,
   timestamp,
   index,
+  primaryKey,
 } from 'drizzle-orm/pg-core';
 import { user } from './auth';
 
@@ -32,4 +33,17 @@ export const message = pgTable(
     createdAt: timestamp('created_at').notNull().defaultNow(),
   },
   (t) => [index('message_conversation_idx').on(t.conversationId, t.createdAt)]
+);
+
+export const widgetSnapshot = pgTable(
+  'chat.widget_snapshot',
+  {
+    conversationId: text('conversation_id')
+      .notNull()
+      .references(() => conversation.id, { onDelete: 'cascade' }),
+    widgetId: text('widget_id').notNull(),
+    state: jsonb('state').notNull(),
+    updatedAt: timestamp('updated_at').notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.conversationId, t.widgetId] })]
 );

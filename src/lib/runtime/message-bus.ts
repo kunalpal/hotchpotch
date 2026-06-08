@@ -11,7 +11,10 @@ export type LifecycleEvent =
   | 'pending-render-queued'
   | 'pending-render-flushed'
   | 'outbound-queued-loading'
-  | 'outbound-queued-pending-renders';
+  | 'outbound-queued-pending-renders'
+  | 'state-snapshot-received'
+  | 'restoring-snapshot'
+  | 'height-changed';
 
 type BusEvents = {
   inbound: [panelId: string, envelope: InboundEnvelope];

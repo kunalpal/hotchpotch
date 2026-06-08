@@ -27,7 +27,8 @@ export type OutboundMessageType =
   | 'TOOL_INVOKE'
   | 'TOOL_TIMEOUT'
   | 'SKILL_INVOKE'
-  | 'REQUEST_SNAPSHOT';
+  | 'REQUEST_SNAPSHOT'
+  | 'RESTORE_STATE';
 
 // ─── Inbound payload schemas (widget → runtime) ───────────────────────────────
 

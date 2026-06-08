@@ -2,19 +2,23 @@
  * Bootstrap script for the Chat module
  *
  * Seeds the dev database with realistic chat conversations and messages.
- * Each conversation exercises a different widget domain (travel, finance, notes).
+ * Covers single-widget and multi-widget scenarios with persisted snapshots.
  */
 
 import { loadEnvConfig } from '@next/env';
 import { createDb } from '../connection';
-import { conversation, message } from '../index';
+import { conversation, message, widgetSnapshot } from '../index';
 import { logger } from './logger';
 import { DEV_USER_ID } from './constants';
 import type { DbInstance, SeedResult } from './module-registry';
 
 type TextPart = { type: 'text'; text: string };
 type StepStartPart = { type: 'step-start' };
-type MessagePart = TextPart | StepStartPart;
+type ToolRenderWidgetPart = {
+  type: 'tool-render_widget';
+  input: { widget_id: string; payload: unknown; update_strategy?: 'mount' | 'replace' };
+};
+type MessagePart = TextPart | StepStartPart | ToolRenderWidgetPart;
 
 function userParts(text: string): MessagePart[] {
   return [{ type: 'text', text }];
@@ -135,6 +139,210 @@ const SEED_CONVERSATIONS: Array<{
   },
 ];
 
+// ─── Multi-widget conversations ───────────────────────────────────────────────
+
+const JAPAN_ITINERARY_PAYLOAD = {
+  days: [
+    { date: '2025-04-01', location: 'Tokyo — Shinjuku & Shibuya', activities: ['Explore Shinjuku Gyoen', 'Shibuya Crossing at night', 'Dinner in Kabukicho'] },
+    { date: '2025-04-02', location: 'Tokyo — Asakusa & Akihabara', activities: ['Senso-ji Temple', 'Nakamise shopping street', 'Akihabara electronics district'] },
+    { date: '2025-04-03', location: 'Nikko', activities: ['Toshogu Shrine', 'Kegon Falls', 'Lake Chuzenji'] },
+    { date: '2025-04-04', location: 'Kyoto — Arashiyama', activities: ['Bamboo grove', 'Tenryu-ji garden', 'Boat ride on Oi River'] },
+    { date: '2025-04-05', location: 'Kyoto — Gion & Fushimi', activities: ['Fushimi Inari torii gates', 'Nishiki Market', 'Gion evening walk'] },
+    { date: '2025-04-06', location: 'Osaka', activities: ['Dotonbori street food', 'Osaka Castle', 'Kuromon Ichiba Market'] },
+    { date: '2025-04-07', location: 'Hiroshima & Miyajima', activities: ['Peace Memorial Park', 'Floating torii gate at Itsukushima', 'Local oysters'] },
+    { date: '2025-04-08', location: 'Hakone', activities: ['Mt. Fuji views across the lake', 'Hakone Open-Air Museum', 'Onsen ryokan stay'] },
+    { date: '2025-04-09', location: 'Tokyo — Harajuku & Shimokitazawa', activities: ['Takeshita Street', 'Meiji Shrine', 'Vintage shops in Shimokitazawa'] },
+    { date: '2025-04-10', location: 'Tokyo — teamLab & departure', activities: ['teamLab Planets', 'Last-minute shopping in Ginza', 'Narita Airport'] },
+  ],
+};
+
+const BERLIN_ITINERARY_PAYLOAD = {
+  days: [
+    { date: '2025-09-15', location: 'Berlin Mitte — Arrival', activities: ['Check in to conference hotel', 'Welcome reception at venue'] },
+    { date: '2025-09-16', location: 'Berlin — Conference Day 1', activities: ['Keynote: Future of AI', 'Workshop: Distributed Systems at Scale', 'Networking dinner in Prenzlauer Berg'] },
+    { date: '2025-09-17', location: 'Berlin — Conference Day 2', activities: ['Keynote: Open Source Futures', 'Talk: WebAssembly Component Model', 'Evening at East Side Gallery'] },
+    { date: '2025-09-18', location: 'Berlin — Sightseeing & Departure', activities: ['Brandenburg Gate', 'Museum Island morning visit', 'Return flight'] },
+  ],
+};
+
+function renderWidgetPart(widgetId: string, payload: unknown): ToolRenderWidgetPart {
+  return { type: 'tool-render_widget', input: { widget_id: widgetId, payload, update_strategy: 'mount' } };
+}
+
+const MULTI_WIDGET_CONVERSATIONS: Array<{
+  id: string;
+  title: string;
+  messages: Array<{ id: string; role: 'user' | 'assistant'; parts: MessagePart[] }>;
+  snapshots: Array<{ widgetId: string; state: Record<string, unknown> }>;
+}> = [
+  {
+    id: 'seed-conv-japan-001',
+    title: 'Japan 10-day trip — map, itinerary & budget',
+    messages: [
+      {
+        id: 'seed-msg-j-001',
+        role: 'user',
+        parts: userParts(
+          "I want to plan a 10-day Japan trip in early April. Can you build a full itinerary with a map and a day-by-day budget? I'm flying in and out of Tokyo."
+        ),
+      },
+      {
+        id: 'seed-msg-j-002',
+        role: 'assistant',
+        parts: [
+          { type: 'step-start' },
+          renderWidgetPart('travel.map', JAPAN_ITINERARY_PAYLOAD),
+          renderWidgetPart('travel.itinerary', JAPAN_ITINERARY_PAYLOAD),
+          renderWidgetPart('finance.budget', JAPAN_ITINERARY_PAYLOAD),
+          {
+            type: 'text',
+            text: "Here's your 10-day Japan itinerary — I've opened three panels:\n\n- **Map** — all 10 locations pinned in order\n- **Itinerary** — day-by-day breakdown with activities\n- **Budget** — estimated ¥200/day baseline; switch to JPY in the budget panel for local costs\n\nHighlights: cherry blossoms in Kyoto on days 4–5, Mt. Fuji views from Hakone on day 8, and teamLab Planets on the last morning. The Nikko day trip (day 3) is optional — drop it if you'd rather spend more time in Tokyo. Want me to add accommodation suggestions or adjust any leg?",
+          },
+        ],
+      },
+      {
+        id: 'seed-msg-j-003',
+        role: 'user',
+        parts: userParts("Drop the Nikko day — I'd rather have a slower Tokyo day. Can you also add a Nara deer park visit instead of the Osaka day?"),
+      },
+      {
+        id: 'seed-msg-j-004',
+        role: 'assistant',
+        parts: [
+          { type: 'step-start' },
+          renderWidgetPart('travel.map', {
+            ...JAPAN_ITINERARY_PAYLOAD,
+            days: JAPAN_ITINERARY_PAYLOAD.days
+              .filter((d) => d.location !== 'Nikko')
+              .map((d) =>
+                d.location === 'Osaka'
+                  ? { ...d, location: 'Nara — Deer Park & Todai-ji', activities: ['Nara Park deer', 'Todai-ji Great Buddha', 'Naramachi historic quarter'] }
+                  : d
+              ),
+          }),
+          renderWidgetPart('travel.itinerary', {
+            ...JAPAN_ITINERARY_PAYLOAD,
+            days: JAPAN_ITINERARY_PAYLOAD.days
+              .filter((d) => d.location !== 'Nikko')
+              .map((d) =>
+                d.location === 'Osaka'
+                  ? { ...d, location: 'Nara — Deer Park & Todai-ji', activities: ['Nara Park deer', 'Todai-ji Great Buddha', 'Naramachi historic quarter'] }
+                  : d
+              ),
+          }),
+          {
+            type: 'text',
+            text: "Done — Nikko is removed and Osaka is replaced with Nara. The freed-up day becomes a relaxed second Tokyo day (Harajuku / Shimokitazawa). Nara is actually ideal from Kyoto: it's only 45 min by Kintetsu express, so you can do it as a half-day and return to Kyoto for the Gion evening. The map and itinerary panels are updated. Budget is unchanged since we kept the same number of days.",
+          },
+        ],
+      },
+    ],
+    snapshots: [
+      {
+        widgetId: 'travel.map',
+        state: { removedLocations: ['Nikko'] },
+      },
+      {
+        widgetId: 'finance.budget',
+        state: {
+          currency: 'JPY',
+          rate: 149.5,
+          userAmounts: {
+            'Day 1 — Tokyo — Shinjuku & Shibuya': '180',
+            'Day 2 — Tokyo — Asakusa & Akihabara': '160',
+            'Day 3 — Kyoto — Arashiyama': '220',
+            'Day 4 — Kyoto — Gion & Fushimi': '195',
+            'Day 5 — Nara — Deer Park & Todai-ji': '140',
+            'Day 6 — Hiroshima & Miyajima': '230',
+            'Day 7 — Hakone': '350',
+            'Day 8 — Tokyo — Harajuku & Shimokitazawa': '175',
+            'Day 9 — Tokyo — teamLab & departure': '150',
+          },
+        },
+      },
+    ],
+  },
+  {
+    id: 'seed-conv-berlin-001',
+    title: 'Berlin tech conference — notes & venue map',
+    messages: [
+      {
+        id: 'seed-msg-b-001',
+        role: 'user',
+        parts: userParts(
+          "I'm attending a 3-day tech conference in Berlin in September. Can you set me up with a venue map and a notes panel to capture highlights?"
+        ),
+      },
+      {
+        id: 'seed-msg-b-002',
+        role: 'assistant',
+        parts: [
+          { type: 'step-start' },
+          renderWidgetPart('travel.map', BERLIN_ITINERARY_PAYLOAD),
+          renderWidgetPart('data.notes', {
+            notes: [
+              { id: 'note-seed-01', title: 'Sessions to prioritise', body: 'Keynote Day 1 (AI), WebAssembly Component Model talk, Distributed Systems workshop.', pinned: true },
+            ],
+          }),
+          {
+            type: 'text',
+            text: "Two panels are open:\n\n- **Map** — conference hotel (Mitte), venue, East Side Gallery, and main sightseeing stops\n- **Notes** — starter note with the sessions worth prioritising; add more as you go\n\nThe conference runs Mon–Wed (15–17 Sep). I've added a sightseeing half-day on the 18th before your return flight. Want me to look up the talk schedule or add hotel suggestions near the venue?",
+          },
+        ],
+      },
+      {
+        id: 'seed-msg-b-003',
+        role: 'user',
+        parts: userParts("Add note: WebAssembly Component Model talk — speaker Lin Clark, key takeaway: interface types enable cross-language composition"),
+      },
+      {
+        id: 'seed-msg-b-004',
+        role: 'assistant',
+        parts: [
+          { type: 'step-start' },
+          {
+            type: 'text',
+            text: "Got it — I've added a note to the panel:\n\n**WebAssembly Component Model**\nSpeaker: Lin Clark\nKey takeaway: interface types enable cross-language composition\n\nYou can pin it in the Notes panel to keep it surfaced for follow-up questions. Want me to find resources on the wasm-component-model RFC or related tooling?",
+          },
+        ],
+      },
+    ],
+    snapshots: [
+      {
+        widgetId: 'data.notes',
+        state: {
+          notes: [
+            {
+              id: 'note-seed-01',
+              title: 'Sessions to prioritise',
+              body: 'Keynote Day 1 (AI), WebAssembly Component Model talk, Distributed Systems workshop.',
+              pinned: true,
+            },
+            {
+              id: 'note-seed-02',
+              title: 'WebAssembly Component Model',
+              body: 'Speaker: Lin Clark. Key takeaway: interface types enable cross-language composition. See wasm-component-model RFC.',
+              pinned: true,
+            },
+            {
+              id: 'note-seed-03',
+              title: 'Contact: Sarah from Vercel',
+              body: 'sarah@vercel.com — Edge Runtime caching improvements. Follow up re: potential collab.',
+              pinned: false,
+            },
+            {
+              id: 'note-seed-04',
+              title: 'Zur Letzten Instanz',
+              body: 'Oldest restaurant in Berlin, near conference. Schnitzel recommended. Need reservations.',
+              pinned: false,
+            },
+          ],
+        },
+      },
+    ],
+  },
+];
+
 export async function bootstrapChat(db: DbInstance): Promise<SeedResult> {
   let inserted = 0;
   let skipped = 0;
@@ -172,6 +380,52 @@ export async function bootstrapChat(db: DbInstance): Promise<SeedResult> {
         .onConflictDoNothing();
 
       if (msgResult.rowCount && msgResult.rowCount > 0) {
+        inserted++;
+      } else {
+        skipped++;
+      }
+    }
+  }
+
+  // Multi-widget conversations with snapshot seeding
+  for (const conv of MULTI_WIDGET_CONVERSATIONS) {
+    logger.detail(`Processing multi-widget conversation: ${conv.title}`);
+
+    const convResult = await db
+      .insert(conversation)
+      .values({ id: conv.id, userId: DEV_USER_ID, title: conv.title })
+      .onConflictDoNothing();
+
+    if (convResult.rowCount && convResult.rowCount > 0) {
+      inserted++;
+      logger.detail(`  Inserted conversation "${conv.title}"`);
+    } else {
+      skipped++;
+      logger.detail(`  Skipped conversation "${conv.title}" (already exists)`);
+      continue;
+    }
+
+    for (const msg of conv.messages) {
+      const msgResult = await db
+        .insert(message)
+        .values({ id: msg.id, conversationId: conv.id, role: msg.role, parts: msg.parts })
+        .onConflictDoNothing();
+
+      if (msgResult.rowCount && msgResult.rowCount > 0) {
+        inserted++;
+      } else {
+        skipped++;
+      }
+    }
+
+    for (const snap of conv.snapshots) {
+      logger.detail(`  Seeding snapshot for widget "${snap.widgetId}"`);
+      const snapResult = await db
+        .insert(widgetSnapshot)
+        .values({ conversationId: conv.id, widgetId: snap.widgetId, state: snap.state })
+        .onConflictDoNothing();
+
+      if (snapResult.rowCount && snapResult.rowCount > 0) {
         inserted++;
       } else {
         skipped++;
